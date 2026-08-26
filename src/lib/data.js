@@ -86,6 +86,21 @@ export async function checkinItem(checkoutId) {
     .update({ checked_in_at: new Date().toISOString() })
     .eq('id', checkoutId)
 }
+export async function getCheckoutHistory(itemId) {
+  return supabase.from('item_checkouts').select('*').eq('item_id', itemId).order('checked_out_at', { ascending: false })
+}
+
+// ---- Item photo (Supabase Storage: bucket 'item-photos') ----
+export async function uploadItemPhoto(file, itemId, userId) {
+  const safe = file.name.replace(/[^a-zA-Z0-9._-]/g, '_')
+  const path = `${itemId}/${Date.now()}-${safe}`
+  const up = await supabase.storage.from('item-photos').upload(path, file, { upsert: true, contentType: file.type })
+  if (up.error) return { error: up.error }
+  const { data } = supabase.storage.from('item-photos').getPublicUrl(path)
+  const url = data.publicUrl
+  const res = await supabase.from('items').update({ photo_url: url, updated_by: userId || null }).eq('id', itemId)
+  return { error: res.error, url }
+}
 
 // ---- Rooms (admin) ----
 export async function addRoom(payload) { return supabase.from('rooms').insert(payload) }

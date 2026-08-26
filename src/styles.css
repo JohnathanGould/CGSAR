@@ -20,6 +20,8 @@ a{color:inherit;text-decoration:none;}
 #brand{padding:20px 18px 14px;border-bottom:1px solid var(--line);}
 #brand .eyebrow{font-size:11px;letter-spacing:.14em;color:var(--accent);text-transform:uppercase;font-weight:700;}
 #brand h1{margin:4px 0 2px;font-size:19px;letter-spacing:.01em;font-weight:800;}
+.brandRow{display:flex;align-items:center;justify-content:space-between;gap:10px;}
+.brandLogo{width:46px;height:46px;object-fit:contain;flex:none;border-radius:50%;background:#fff;padding:2px;}
 #brand .sub{font-size:12px;color:var(--muted);}
 
 #searchWrap{padding:14px 18px;border-bottom:1px solid var(--line);}
@@ -174,3 +176,8 @@ svg#plan{width:100%;max-width:1100px;height:auto;}
 
 .checkRow{display:flex;align-items:center;gap:8px;font-size:13.5px;padding:6px 0;}
 .checkRow input{width:auto;}
+.sopText{white-space:pre-wrap;background:var(--panel-2);border:1px solid var(--line);border-radius:8px;padding:11px 12px;font-size:13px;color:var(--text);min-height:60px;line-height:1.5;}
+.itemPhoto{width:100%;max-height:220px;object-fit:cover;border-radius:10px;border:1px solid var(--line);margin-bottom:8px;}
+.histRow{display:flex;justify-content:space-between;gap:10px;font-size:12.5px;padding:7px 0;border-bottom:1px solid var(--line);}
+.histRow:last-child{border-bottom:none;}
+.histRow .hstatus{font-weight:700;white-space:nowrap;}

@@ -1,13 +1,15 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import {
-  Search, LayoutDashboard, Map, Users, Shield, LogIn, LogOut,
+  Search, LayoutDashboard, Map, Users, Shield, LogIn, LogOut, Siren,
 } from 'lucide-react'
 import { supabase } from './lib/supabase'
+import logo from './assets/logo.png'
 import { loadAll } from './lib/data'
 import { saveCache, loadCache } from './lib/cache'
 import { replacementBadge } from './lib/helpers'
 import Floorplan, { topoPaths } from './components/Floorplan'
 import Dashboard from './components/Dashboard'
+import Callout from './components/Callout'
 import DetailDrawer from './components/DetailDrawer'
 import Units from './components/Units'
 import Admin from './components/Admin'
@@ -104,7 +106,7 @@ export default function App() {
       const it = data.items.find((x) => x.id === drawer.itemId)
       return ['Base', room?.name, c?.name, it?.name].filter(Boolean).join('  ›  ')
     }
-    return { dashboard: 'Base Dashboard', floorplan: 'Base Overview', units: 'Units', admin: 'Admin' }[view]
+    return { dashboard: 'Base Dashboard', floorplan: 'Base Overview', callout: 'Callout', units: 'Units', admin: 'Admin' }[view]
   }
 
   const NavItem = ({ id, icon: Icon, label }) => (
@@ -123,7 +125,10 @@ export default function App() {
       <div id="sidebar">
         <div id="brand">
           <div className="eyebrow">Colchester GSAR</div>
-          <h1>Home Base</h1>
+          <div className="brandRow">
+            <h1>Home Base</h1>
+            <img src={logo} className="brandLogo" alt="Colchester Ground Search &amp; Rescue Association" />
+          </div>
           <div className="sub">73 Ventura Dr, Debert NS</div>
         </div>
 
@@ -147,6 +152,7 @@ export default function App() {
         <div id="nav">
           <NavItem id="dashboard" icon={LayoutDashboard} label="Dashboard" />
           <NavItem id="floorplan" icon={Map} label="Floorplan" />
+          <NavItem id="callout" icon={Siren} label="Callout" />
           <NavItem id="units" icon={Users} label="Units" />
           {isAdmin && <NavItem id="admin" icon={Shield} label="Admin" />}
         </div>
@@ -186,6 +192,8 @@ export default function App() {
             <Dashboard ctx={ctx} />
           ) : view === 'floorplan' ? (
             <Floorplan rooms={data.rooms} activeRoomId={drawer.roomId} hitRoomIds={hitRoomIds} onRoomClick={(r) => openRoom(r.id)} />
+          ) : view === 'callout' ? (
+            <Callout ctx={ctx} />
           ) : view === 'units' ? (
             <Units ctx={ctx} />
           ) : view === 'admin' ? (

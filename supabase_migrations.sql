@@ -54,6 +54,7 @@ create table if not exists public.items (
   min_qty                int not null default 0,   -- low-stock threshold (0 = no alert)
   loc_detail             text,
   status                 text,
+  photo_url              text,
   needs_replacement_by   date,
   needs_replacement_note text,
   updated_at             timestamptz not null default now(),
@@ -97,6 +98,27 @@ create index if not exists checkouts_item_idx on public.item_checkouts(item_id);
 
 -- Safe to re-run if items table already existed before min_qty was added.
 alter table public.items add column if not exists min_qty int not null default 0;
+alter table public.items add column if not exists photo_url text;
+
+-- ---------------------------------------------------------------------
+-- STORAGE: public bucket for item photos
+-- ---------------------------------------------------------------------
+insert into storage.buckets (id, name, public)
+values ('item-photos', 'item-photos', true)
+on conflict (id) do nothing;
+
+drop policy if exists "item photos public read" on storage.objects;
+create policy "item photos public read" on storage.objects for select to anon, authenticated
+  using (bucket_id = 'item-photos');
+drop policy if exists "item photos auth insert" on storage.objects;
+create policy "item photos auth insert" on storage.objects for insert to authenticated
+  with check (bucket_id = 'item-photos');
+drop policy if exists "item photos auth update" on storage.objects;
+create policy "item photos auth update" on storage.objects for update to authenticated
+  using (bucket_id = 'item-photos');
+drop policy if exists "item photos auth delete" on storage.objects;
+create policy "item photos auth delete" on storage.objects for delete to authenticated
+  using (bucket_id = 'item-photos');
 
 -- ---------------------------------------------------------------------
 -- TRIGGERS

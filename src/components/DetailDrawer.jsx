@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import {
   X, ChevronRight, Plus, Pencil, Trash2, ClipboardCheck, PackageOpen,
-  LogOut, LogIn, Save, QrCode,
+  LogOut, LogIn, Save, QrCode, Camera, History,
 } from 'lucide-react'
 import { replacementBadge, fmtDate, fmtDateTime, lowStock } from '../lib/helpers'
 import * as api from '../lib/data'
@@ -118,6 +118,8 @@ export default function DetailDrawer({ ctx, drawer }) {
   const [modal, setModal] = useState(null) // {type, item}
   const [invDraft, setInvDraft] = useState({})
   const [sop, setSop] = useState({ setup_sop: '', takedown_sop: '' })
+  const [history, setHistory] = useState([])
+  const [photoBusy, setPhotoBusy] = useState(false)
 
   const rooms = data.rooms
   const room = rooms.find((r) => r.id === drawer.roomId)
@@ -148,6 +150,25 @@ export default function DetailDrawer({ ctx, drawer }) {
 
   const err = (r) => { if (r && r.error) alert(r.error.message) }
   const done = async (r) => { err(r); await refresh() }
+
+  useEffect(() => {
+    if (drawer.mode === 'item' && drawer.itemId) {
+      api.getCheckoutHistory(drawer.itemId).then((r) => setHistory(r.data || []))
+    } else {
+      setHistory([])
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [drawer.mode, drawer.itemId, data.checkouts])
+
+  async function handlePhoto(e) {
+    const file = e.target.files && e.target.files[0]
+    if (!file) return
+    setPhotoBusy(true)
+    const { error } = await api.uploadItemPhoto(file, item.id, userId)
+    setPhotoBusy(false)
+    if (error) alert(error.message)
+    else await refresh()
+  }
 
   /* ---- ROOM MODE: container list ---- */
   function renderRoom() {
@@ -277,6 +298,13 @@ export default function DetailDrawer({ ctx, drawer }) {
           <h3>{item.name}</h3>
         </div>
         <div id="drawerBody">
+          {item.photo_url && <img className="itemPhoto" src={item.photo_url} alt={item.name} />}
+          {canEdit && (
+            <label className="btn sm block" style={{ marginBottom: 12, cursor: 'pointer' }}>
+              <Camera size={13} /> {photoBusy ? 'Uploading…' : (item.photo_url ? 'Replace photo' : 'Add photo')}
+              <input type="file" accept="image/*" style={{ display: 'none' }} onChange={handlePhoto} disabled={photoBusy} />
+            </label>
+          )}
           <div className="kv"><span className="k">Quantity</span><span className="v" style={{ color: lowStock(item) ? 'var(--overdue)' : 'var(--ok)' }}>×{item.qty} {lowStock(item) && <span className="badge low">Low stock</span>}</span></div>
           {item.min_qty > 0 && <div className="kv"><span className="k">Low-stock min</span><span className="v">{item.min_qty}</span></div>}
           <div className="kv"><span className="k">Location</span><span className="v">{item.loc_detail || '—'}</span></div>
@@ -302,6 +330,16 @@ export default function DetailDrawer({ ctx, drawer }) {
               {canEdit && <button className="btn block" style={{ marginTop: 10 }} onClick={() => setModal({ type: 'checkout' })}><LogOut size={15} /> Check out</button>}
             </>
           )}
+
+          <p className="sectionLabel" style={{ marginTop: 20 }}><History size={13} style={{ verticalAlign: '-2px', marginRight: 4 }} />Sign-out history</p>
+          {history.length === 0 ? (
+            <div className="hint">No sign-out records yet.</div>
+          ) : history.map((h) => (
+            <div key={h.id} className="histRow">
+              <span>{h.checked_out_by} · {fmtDate(h.checked_out_at)}</span>
+              <span className="hstatus" style={{ color: h.checked_in_at ? 'var(--ok)' : 'var(--soon)' }}>{h.checked_in_at ? 'returned ' + fmtDate(h.checked_in_at) : 'still out'}</span>
+            </div>
+          ))}
 
           {canEdit && (
             <div className="rowActions" style={{ marginTop: 20 }}>
