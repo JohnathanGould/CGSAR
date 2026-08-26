@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import {
-  Search, LayoutDashboard, Map, Users, Shield, LogIn, LogOut, Siren,
+  Search, LayoutDashboard, Map, Users, Shield, LogIn, LogOut, Siren, HelpCircle,
 } from 'lucide-react'
 import { supabase } from './lib/supabase'
 import logo from './assets/logo.png'
@@ -11,6 +11,7 @@ import Floorplan, { topoPaths } from './components/Floorplan'
 import Dashboard from './components/Dashboard'
 import Callout from './components/Callout'
 import DetailDrawer from './components/DetailDrawer'
+import HelpModal from './components/HelpModal'
 import OrgChart from './components/OrgChart'
 import Admin from './components/Admin'
 import Modal from './components/Modal'
@@ -27,6 +28,7 @@ export default function App() {
   const [drawer, setDrawer] = useState({ open: false, mode: 'room', roomId: null, containerId: null, itemId: null })
   const [query, setQuery] = useState('')
   const [authOpen, setAuthOpen] = useState(false)
+  const [helpOpen, setHelpOpen] = useState(false)
   const deepLinkDone = React.useRef(false)
 
   async function refresh() {
@@ -180,7 +182,10 @@ export default function App() {
         {offline && <div className="offlineBar">Offline — showing last-known data from this device. Changes can’t be saved until you reconnect.</div>}
         <div id="topbar">
           <h2>{crumb()}</h2>
-          <div className="addr">Ground floor · 73 Ventura Dr, Debert NS</div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+            <div className="addr">Ground floor · 73 Ventura Dr, Debert NS</div>
+            <button className="helpBtn" title="Help — how this app works" aria-label="Help" onClick={() => setHelpOpen(true)}><HelpCircle size={18} /></button>
+          </div>
         </div>
         <div id="content">
           {loading ? (
@@ -217,6 +222,7 @@ export default function App() {
       <DetailDrawer ctx={ctx} drawer={drawer} />
 
       {authOpen && <AuthModal onClose={() => setAuthOpen(false)} />}
+      {helpOpen && <HelpModal isAdmin={isAdmin} onClose={() => setHelpOpen(false)} />}
     </div>
   )
 }
