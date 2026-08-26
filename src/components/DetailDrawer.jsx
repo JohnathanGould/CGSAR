@@ -1,15 +1,16 @@
 import React, { useEffect, useState } from 'react'
 import {
   X, ChevronRight, Plus, Pencil, Trash2, ClipboardCheck, PackageOpen,
-  LogOut, LogIn, Save,
+  LogOut, LogIn, Save, QrCode,
 } from 'lucide-react'
-import { replacementBadge, fmtDate, fmtDateTime } from '../lib/helpers'
+import { replacementBadge, fmtDate, fmtDateTime, lowStock } from '../lib/helpers'
 import * as api from '../lib/data'
+import QRModal from './QRModal'
 
 /* ------------------------- small forms ------------------------- */
 function ItemForm({ initial, onCancel, onSave }) {
   const [f, setF] = useState({
-    name: initial?.name || '', qty: initial?.qty ?? 1,
+    name: initial?.name || '', qty: initial?.qty ?? 1, min_qty: initial?.min_qty ?? 0,
     loc_detail: initial?.loc_detail || '', status: initial?.status || 'Available',
     needs_replacement_by: initial?.needs_replacement_by || '',
     needs_replacement_note: initial?.needs_replacement_note || '',
@@ -21,7 +22,7 @@ function ItemForm({ initial, onCancel, onSave }) {
     if (!f.name.trim()) { setErr('Name is required'); return }
     setBusy(true)
     const payload = {
-      name: f.name.trim(), qty: parseInt(f.qty, 10) || 0,
+      name: f.name.trim(), qty: parseInt(f.qty, 10) || 0, min_qty: parseInt(f.min_qty, 10) || 0,
       loc_detail: f.loc_detail.trim() || null, status: f.status.trim() || null,
       needs_replacement_by: f.needs_replacement_by || null,
       needs_replacement_note: f.needs_replacement_note.trim() || null,
@@ -35,6 +36,7 @@ function ItemForm({ initial, onCancel, onSave }) {
       <div className="field"><label>Item name</label><input value={f.name} onChange={up('name')} autoFocus /></div>
       <div className="formRow">
         <div className="field"><label>Quantity</label><input type="number" value={f.qty} onChange={up('qty')} /></div>
+        <div className="field"><label>Low-stock min</label><input type="number" value={f.min_qty} onChange={up('min_qty')} /></div>
         <div className="field"><label>Status</label><input value={f.status} onChange={up('status')} placeholder="Available" /></div>
       </div>
       <div className="field"><label>Location detail</label><input value={f.loc_detail} onChange={up('loc_detail')} placeholder="e.g. Bin 3, upper shelf" /></div>
@@ -201,6 +203,8 @@ export default function DetailDrawer({ ctx, drawer }) {
               : 'Never checked'}
           </div>
 
+          <button className="btn sm" style={{ marginBottom: 14 }} onClick={() => setModal({ type: 'qr' })}><QrCode size={13} /> QR tag</button>
+
           {container?.is_vehicle_unit && (
             <div className="tabs">
               <button className={'tab' + (tab === 'items' ? ' active' : '')} onClick={() => setTab('items')}>Items</button>
@@ -229,7 +233,7 @@ export default function DetailDrawer({ ctx, drawer }) {
             return (
               <div key={it.id} className="item" onClick={() => openItem(drawer.roomId, drawer.containerId, it.id)}>
                 <div className="itop">
-                  <span className="iname">{it.name}{badge && <span className={'badge ' + badge.kind} style={{ marginLeft: 8 }}>{badge.label}</span>}</span>
+                  <span className="iname">{it.name}{badge && <span className={'badge ' + badge.kind} style={{ marginLeft: 8 }}>{badge.label}</span>}{lowStock(it) && <span className="badge low" style={{ marginLeft: 8 }}>Low stock</span>}</span>
                   <span className="iqty">×{it.qty}</span>
                 </div>
                 <div className="iloc">{it.loc_detail || 'No location detail'}</div>
@@ -273,7 +277,8 @@ export default function DetailDrawer({ ctx, drawer }) {
           <h3>{item.name}</h3>
         </div>
         <div id="drawerBody">
-          <div className="kv"><span className="k">Quantity</span><span className="v" style={{ color: 'var(--ok)' }}>×{item.qty}</span></div>
+          <div className="kv"><span className="k">Quantity</span><span className="v" style={{ color: lowStock(item) ? 'var(--overdue)' : 'var(--ok)' }}>×{item.qty} {lowStock(item) && <span className="badge low">Low stock</span>}</span></div>
+          {item.min_qty > 0 && <div className="kv"><span className="k">Low-stock min</span><span className="v">{item.min_qty}</span></div>}
           <div className="kv"><span className="k">Location</span><span className="v">{item.loc_detail || '—'}</span></div>
           <div className="kv"><span className="k">Status</span><span className="v">{item.status || '—'}</span></div>
 
@@ -403,11 +408,12 @@ export default function DetailDrawer({ ctx, drawer }) {
           }} />
         </ModalWrap>
       )}
+      {modal?.type === 'qr' && container && (
+        <QRModal container={container} roomName={room?.name} onClose={() => setModal(null)} />
+      )}
     </div>
   )
 }
-
-// tiny inline modal wrapper to avoid extra import churn
 function ModalWrap({ title, onClose, children }) {
   return (
     <div className="modalOverlay" onClick={onClose}>

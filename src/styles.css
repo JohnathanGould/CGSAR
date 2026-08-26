@@ -103,6 +103,7 @@ svg#plan{width:100%;max-width:1100px;height:auto;}
 .badge{display:inline-flex;align-items:center;gap:4px;font-size:10px;padding:2px 7px;border-radius:20px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;}
 .badge.overdue{background:rgba(224,92,92,.16);color:var(--overdue);}
 .badge.soon{background:rgba(232,169,12,.16);color:var(--soon);}
+.badge.low{background:rgba(224,92,92,.16);color:var(--overdue);}
 .teamBadge{font-size:10px;padding:2px 7px;border-radius:20px;background:var(--accent-dim);color:#ffcfae;font-weight:700;letter-spacing:.03em;}
 
 .emptyState{text-align:center;padding:40px 10px;color:var(--muted);font-size:13px;line-height:1.6;}

@@ -17,6 +17,11 @@ export function isStale(container) {
   return Date.now() - d.getTime() > 30 * 86400000
 }
 
+// Low-stock: a positive threshold that current qty has dropped to or below.
+export function lowStock(item) {
+  return !!item && item.min_qty > 0 && item.qty <= item.min_qty
+}
+
 export function fmtDate(d) {
   if (!d) return null
   try { return new Date(d).toLocaleDateString('en-CA') } catch { return String(d) }

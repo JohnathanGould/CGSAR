@@ -51,6 +51,7 @@ create table if not exists public.items (
   container_id           uuid not null references public.containers(id) on delete cascade,
   name                   text not null,
   qty                    int not null default 0,
+  min_qty                int not null default 0,   -- low-stock threshold (0 = no alert)
   loc_detail             text,
   status                 text,
   needs_replacement_by   date,
@@ -93,6 +94,9 @@ create index if not exists containers_room_idx on public.containers(room_id);
 create index if not exists items_container_idx on public.items(container_id);
 create index if not exists items_name_idx on public.items using gin (to_tsvector('simple', name));
 create index if not exists checkouts_item_idx on public.item_checkouts(item_id);
+
+-- Safe to re-run if items table already existed before min_qty was added.
+alter table public.items add column if not exists min_qty int not null default 0;
 
 -- ---------------------------------------------------------------------
 -- TRIGGERS

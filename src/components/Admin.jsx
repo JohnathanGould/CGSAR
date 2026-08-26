@@ -1,6 +1,7 @@
 import React, { useState } from 'react'
-import { Plus, Trash2, Save } from 'lucide-react'
+import { Plus, Trash2, Save, Download, QrCode } from 'lucide-react'
 import * as api from '../lib/data'
+import { exportInventoryCsv, printAllQrTags } from '../lib/exports'
 import Modal from './Modal'
 
 export default function Admin({ ctx }) {
@@ -11,6 +12,10 @@ export default function Admin({ ctx }) {
   return (
     <div>
       <div className="pageHead"><h2>Admin</h2><p>Structure the base: rooms, teams, and who can edit what.</p></div>
+      <div className="rowActions" style={{ margin: '0 0 18px' }}>
+        <button className="btn" onClick={() => exportInventoryCsv(data)}><Download size={14} /> Export inventory CSV</button>
+        <button className="btn" onClick={() => printAllQrTags(data)}><QrCode size={14} /> Print all QR tags</button>
+      </div>
       <div className="tabs">
         {['rooms', 'teams', 'members'].map((t) => (
           <button key={t} className={'tab' + (tab === t ? ' active' : '')} onClick={() => setTab(t)}>{t[0].toUpperCase() + t.slice(1)}</button>

@@ -1,6 +1,6 @@
 import React from 'react'
-import { AlertTriangle, ClipboardList, ChevronRight } from 'lucide-react'
-import { replacementBadge, isStale, fmtDate } from '../lib/helpers'
+import { AlertTriangle, ClipboardList, ChevronRight, PackageX } from 'lucide-react'
+import { replacementBadge, isStale, lowStock, fmtDate } from '../lib/helpers'
 
 export default function Dashboard({ ctx }) {
   const { data, openItem, openInventory, profileName } = ctx
@@ -12,6 +12,7 @@ export default function Dashboard({ ctx }) {
     .filter((x) => x.badge)
     .sort((a, b) => (a.badge.kind === 'overdue' ? -1 : 1) - (b.badge.kind === 'overdue' ? -1 : 1))
 
+  const low = data.items.filter(lowStock)
   const stale = data.containers.filter(isStale)
 
   return (
@@ -58,6 +59,27 @@ export default function Dashboard({ ctx }) {
                   <div className="lr-main">
                     <div className="lr-title">{c.name}</div>
                     <div className="lr-sub">{r?.name} · {when}</div>
+                  </div>
+                  <ChevronRight className="lr-arrow" size={16} />
+                </div>
+              )
+            })
+          )}
+        </div>
+
+        <div className="card">
+          <h3><PackageX size={16} color="var(--accent)" /> Low stock <span className="count">{low.length}</span></h3>
+          {low.length === 0 ? (
+            <div className="emptyState" style={{ padding: '24px 6px' }}>Nothing below its minimum.</div>
+          ) : (
+            low.map((it) => {
+              const c = containerById[it.container_id]
+              const r = c && roomById[c.room_id]
+              return (
+                <div key={it.id} className="listRow" onClick={() => openItem(c?.room_id, it.container_id, it.id)}>
+                  <div className="lr-main">
+                    <div className="lr-title">{it.name} <span className="badge low">×{it.qty} / min {it.min_qty}</span></div>
+                    <div className="lr-sub">{r?.name} → {c?.name}</div>
                   </div>
                   <ChevronRight className="lr-arrow" size={16} />
                 </div>
