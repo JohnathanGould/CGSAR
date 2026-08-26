@@ -120,6 +120,9 @@ export default function DetailDrawer({ ctx, drawer }) {
   const [sop, setSop] = useState({ setup_sop: '', takedown_sop: '' })
   const [history, setHistory] = useState([])
   const [photoBusy, setPhotoBusy] = useState(false)
+  const [invNotes, setInvNotes] = useState('')
+  const [histOpen, setHistOpen] = useState(false)
+  const [invHistory, setInvHistory] = useState([])
 
   const rooms = data.rooms
   const room = rooms.find((r) => r.id === drawer.roomId)
@@ -135,10 +138,20 @@ export default function DetailDrawer({ ctx, drawer }) {
       const d = {}
       itemsOfContainer.forEach((i) => { d[i.id] = i.qty })
       setInvDraft(d)
+      setInvNotes('')
     }
+    setHistOpen(false)
+    setInvHistory([])
     if (container) setSop({ setup_sop: container.setup_sop || '', takedown_sop: container.takedown_sop || '' })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [drawer.mode, drawer.containerId])
+
+  async function loadInvHistory() {
+    if (!container) return
+    const r = await api.getInventoryHistory(container.id)
+    setInvHistory(r.data || [])
+    setHistOpen(true)
+  }
 
   if (!drawer.open) {
     return (
@@ -225,6 +238,30 @@ export default function DetailDrawer({ ctx, drawer }) {
           </div>
 
           <button className="btn sm" style={{ marginBottom: 14 }} onClick={() => setModal({ type: 'qr' })}><QrCode size={13} /> QR tag</button>
+
+          <div style={{ marginBottom: 14 }}>
+            <button className="btn sm ghost" onClick={() => (histOpen ? setHistOpen(false) : loadInvHistory())}><History size={13} /> {histOpen ? 'Hide check history' : 'View check history'}</button>
+            {histOpen && (
+              invHistory.length === 0 ? (
+                <div className="hint" style={{ marginTop: 8 }}>No inventory checks recorded yet.</div>
+              ) : (
+                <div style={{ marginTop: 8 }}>
+                  {invHistory.map((h) => (
+                    <div key={h.id} className="histCard">
+                      <div className="histHead">{fmtDateTime(h.checked_at)} · {h.checked_by ? profileName(h.checked_by) : 'unknown'}</div>
+                      {h.notes && <div className="histNotes">“{h.notes}”</div>}
+                      {(h.inventory_check_line_items || []).length === 0 ? (
+                        <div className="hint">No quantity changes this pass.</div>
+                      ) : (h.inventory_check_line_items || []).map((li) => {
+                        const it = data.items.find((x) => x.id === li.item_id)
+                        return <div key={li.id} className="histRow"><span>{it?.name || 'item'}</span><span className="hstatus">{li.qty_before} → {li.qty_after}</span></div>
+                      })}
+                    </div>
+                  ))}
+                </div>
+              )
+            )}
+          </div>
 
           {container?.is_vehicle_unit && (
             <div className="tabs">
@@ -377,13 +414,19 @@ export default function DetailDrawer({ ctx, drawer }) {
             </div>
           ))}
           {canEdit && itemsOfContainer.length > 0 && (
-            <button className="btn accent block" style={{ marginTop: 10 }} onClick={async () => {
-              const updates = itemsOfContainer
-                .filter((it) => String(invDraft[it.id]) !== String(it.qty))
-                .map((it) => ({ id: it.id, qty: parseInt(invDraft[it.id], 10) || 0 }))
-              done(await api.saveInventory(container.id, updates, userId))
-              openContainer(drawer.roomId, drawer.containerId)
-            }}><Save size={15} /> Save inventory check</button>
+            <>
+              <div className="field" style={{ marginTop: 14 }}>
+                <label>Notes (optional)</label>
+                <textarea value={invNotes} onChange={(e) => setInvNotes(e.target.value)} placeholder="e.g. found 2 short on gauze, reordered" style={{ minHeight: 70 }} />
+              </div>
+              <button className="btn accent block" style={{ marginTop: 6 }} onClick={async () => {
+                const changes = itemsOfContainer
+                  .filter((it) => String(invDraft[it.id]) !== String(it.qty))
+                  .map((it) => ({ id: it.id, before: it.qty, after: parseInt(invDraft[it.id], 10) || 0 }))
+                done(await api.saveInventory(container.id, changes, userId, invNotes))
+                openContainer(drawer.roomId, drawer.containerId)
+              }}><Save size={15} /> Save inventory check</button>
+            </>
           )}
         </div>
       </>

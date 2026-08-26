@@ -70,19 +70,19 @@ create table if not exists public.user_teams (
   primary key (user_id, team_id)
 );
 
-create table if not exists public.units (
+create table if not exists public.org_positions (
   id         uuid primary key default gen_random_uuid(),
-  name       text not null,
+  parent_id  uuid references public.org_positions(id) on delete cascade,
+  title      text not null,
   sort_order int not null default 0
 );
 
-create table if not exists public.unit_members (
-  id         uuid primary key default gen_random_uuid(),
-  unit_id    uuid not null references public.units(id) on delete cascade,
-  name       text not null,
-  role       text not null default 'Member',
-  profile_id uuid references public.profiles(id) on delete set null,
-  sort_order int not null default 0
+create table if not exists public.org_position_members (
+  id          uuid primary key default gen_random_uuid(),
+  position_id uuid not null references public.org_positions(id) on delete cascade,
+  name        text not null,
+  role        text,                 -- 'Lead'/'Member' for unit-style nodes; null for plain rank nodes
+  sort_order  int not null default 0
 );
 
 create table if not exists public.item_checkouts (
@@ -94,10 +94,31 @@ create table if not exists public.item_checkouts (
   checked_in_at  timestamptz
 );
 
+-- Full audit log of every "Take Inventory" pass (append-only).
+create table if not exists public.inventory_checks (
+  id           uuid primary key default gen_random_uuid(),
+  container_id uuid not null references public.containers(id) on delete cascade,
+  checked_by   uuid references public.profiles(id) on delete set null,
+  checked_at   timestamptz not null default now(),
+  notes        text
+);
+
+create table if not exists public.inventory_check_line_items (
+  id                 uuid primary key default gen_random_uuid(),
+  inventory_check_id uuid not null references public.inventory_checks(id) on delete cascade,
+  item_id            uuid references public.items(id) on delete set null,
+  qty_before         int,
+  qty_after          int
+);
+
 create index if not exists containers_room_idx on public.containers(room_id);
 create index if not exists items_container_idx on public.items(container_id);
 create index if not exists items_name_idx on public.items using gin (to_tsvector('simple', name));
 create index if not exists checkouts_item_idx on public.item_checkouts(item_id);
+create index if not exists inv_checks_container_idx on public.inventory_checks(container_id);
+create index if not exists inv_check_lines_check_idx on public.inventory_check_line_items(inventory_check_id);
+create index if not exists org_positions_parent_idx on public.org_positions(parent_id);
+create index if not exists org_members_position_idx on public.org_position_members(position_id);
 
 -- Safe to re-run if items table already existed before min_qty was added.
 alter table public.items add column if not exists min_qty int not null default 0;
@@ -196,13 +217,15 @@ $$;
 grant usage on schema public to anon, authenticated;
 
 grant select on public.profiles, public.teams, public.rooms, public.containers,
-  public.items, public.user_teams, public.units, public.unit_members,
-  public.item_checkouts to anon, authenticated;
+  public.items, public.user_teams, public.org_positions, public.org_position_members,
+  public.item_checkouts, public.inventory_checks, public.inventory_check_line_items to anon, authenticated;
 
 grant insert, update, delete on public.teams, public.rooms, public.containers,
-  public.items, public.user_teams, public.units, public.unit_members,
+  public.items, public.user_teams, public.org_positions, public.org_position_members,
   public.item_checkouts to authenticated;
 grant update on public.profiles to authenticated;
+-- Audit log is append-only: insert only, never update/delete (not even admins).
+grant insert on public.inventory_checks, public.inventory_check_line_items to authenticated;
 
 grant execute on function public.is_admin(), public.is_team_member(uuid),
   public.can_edit_container(uuid), public.can_edit_item(uuid) to anon, authenticated;
@@ -216,9 +239,11 @@ alter table public.rooms          enable row level security;
 alter table public.containers     enable row level security;
 alter table public.items          enable row level security;
 alter table public.user_teams     enable row level security;
-alter table public.units          enable row level security;
-alter table public.unit_members   enable row level security;
+alter table public.org_positions        enable row level security;
+alter table public.org_position_members enable row level security;
 alter table public.item_checkouts enable row level security;
+alter table public.inventory_checks           enable row level security;
+alter table public.inventory_check_line_items enable row level security;
 
 -- ---------------------------------------------------------------------
 -- POLICIES
@@ -295,18 +320,35 @@ drop policy if exists user_teams_admin_all on public.user_teams;
 create policy user_teams_admin_all on public.user_teams for all to authenticated
   using (public.is_admin()) with check (public.is_admin());
 
--- units + unit_members: public read; admin write (people directory, not team-scoped).
-drop policy if exists units_read on public.units;
-create policy units_read on public.units for select to anon, authenticated using (true);
-drop policy if exists units_admin_all on public.units;
-create policy units_admin_all on public.units for all to authenticated
+-- org_positions + org_position_members: public read; admin write (identity/structure data).
+drop policy if exists org_positions_read on public.org_positions;
+create policy org_positions_read on public.org_positions for select to anon, authenticated using (true);
+drop policy if exists org_positions_admin_all on public.org_positions;
+create policy org_positions_admin_all on public.org_positions for all to authenticated
   using (public.is_admin()) with check (public.is_admin());
 
-drop policy if exists unit_members_read on public.unit_members;
-create policy unit_members_read on public.unit_members for select to anon, authenticated using (true);
-drop policy if exists unit_members_admin_all on public.unit_members;
-create policy unit_members_admin_all on public.unit_members for all to authenticated
+drop policy if exists org_members_read on public.org_position_members;
+create policy org_members_read on public.org_position_members for select to anon, authenticated using (true);
+drop policy if exists org_members_admin_all on public.org_position_members;
+create policy org_members_admin_all on public.org_position_members for all to authenticated
   using (public.is_admin()) with check (public.is_admin());
+
+-- inventory_checks + line items: PUBLIC read; APPEND-ONLY insert by whoever can edit the
+-- container. No update/delete policies exist, so the log can never be edited or deleted (incl. admins).
+drop policy if exists inv_checks_read on public.inventory_checks;
+create policy inv_checks_read on public.inventory_checks for select to anon, authenticated using (true);
+drop policy if exists inv_checks_insert on public.inventory_checks;
+create policy inv_checks_insert on public.inventory_checks for insert to authenticated
+  with check (checked_by = auth.uid() and public.can_edit_container(container_id));
+
+drop policy if exists inv_lines_read on public.inventory_check_line_items;
+create policy inv_lines_read on public.inventory_check_line_items for select to anon, authenticated using (true);
+drop policy if exists inv_lines_insert on public.inventory_check_line_items;
+create policy inv_lines_insert on public.inventory_check_line_items for insert to authenticated
+  with check (exists (
+    select 1 from public.inventory_checks ic
+    where ic.id = inventory_check_id and public.can_edit_container(ic.container_id)
+  ));
 
 -- =====================================================================
 -- SEED DATA  (safe to re-run: guarded by 'not exists' on teams)
@@ -330,9 +372,20 @@ begin
       ('Rest Rooms',    'Facilities',                  670, 330, 80,  100, 7),
       ('Classroom (2)', 'Meeting space',               760, 170, 200, 250, 8);
 
-    -- Units (org roster) — empty rosters
-    insert into public.units (name, sort_order) values
-      ('RPAS', 1), ('Medical', 2), ('Food Unit', 3);
+    -- Org chart starting tree (rosters intentionally empty — no names invented)
+    insert into public.org_positions (parent_id, title, sort_order) values (null, 'President', 1);
+    insert into public.org_positions (parent_id, title, sort_order)
+      select id, 'Search Managers', 1 from public.org_positions where title = 'President';
+    insert into public.org_positions (parent_id, title, sort_order)
+      select id, 'Team Leads', 1 from public.org_positions where title = 'Search Managers';
+    insert into public.org_positions (parent_id, title, sort_order)
+      select id, 'Searchers', 1 from public.org_positions where title = 'Team Leads';
+    insert into public.org_positions (parent_id, title, sort_order)
+      select id, 'Medical', 2 from public.org_positions where title = 'President';
+    insert into public.org_positions (parent_id, title, sort_order)
+      select id, 'RPAS', 3 from public.org_positions where title = 'President';
+    insert into public.org_positions (parent_id, title, sort_order)
+      select id, 'Food Unit', 4 from public.org_positions where title = 'President';
 
     -- Vehicle Bays containers (all is_vehicle_unit = true, SOP blank)
     insert into public.containers (room_id, team_id, name, sort_order, is_vehicle_unit)

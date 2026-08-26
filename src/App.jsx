@@ -11,11 +11,11 @@ import Floorplan, { topoPaths } from './components/Floorplan'
 import Dashboard from './components/Dashboard'
 import Callout from './components/Callout'
 import DetailDrawer from './components/DetailDrawer'
-import Units from './components/Units'
+import OrgChart from './components/OrgChart'
 import Admin from './components/Admin'
 import Modal from './components/Modal'
 
-const EMPTY = { teams: [], rooms: [], containers: [], items: [], units: [], unitMembers: [], checkouts: [], userTeams: [], profiles: [] }
+const EMPTY = { teams: [], rooms: [], containers: [], items: [], orgPositions: [], orgMembers: [], checkouts: [], userTeams: [], profiles: [] }
 
 export default function App() {
   const [session, setSession] = useState(null)
@@ -108,7 +108,7 @@ export default function App() {
       const it = data.items.find((x) => x.id === drawer.itemId)
       return ['Base', room?.name, c?.name, it?.name].filter(Boolean).join('  ›  ')
     }
-    return { dashboard: 'Base Dashboard', floorplan: 'Base Overview', callout: 'Callout', units: 'Units', admin: 'Admin' }[view]
+    return { dashboard: 'Base Dashboard', floorplan: 'Base Overview', callout: 'Callout', org: 'Org Chart', units: 'Org Chart', admin: 'Admin' }[view]
   }
 
   const NavItem = ({ id, icon: Icon, label }) => (
@@ -155,7 +155,7 @@ export default function App() {
           <NavItem id="dashboard" icon={LayoutDashboard} label="Dashboard" />
           <NavItem id="floorplan" icon={Map} label="Floorplan" />
           <NavItem id="callout" icon={Siren} label="Callout" />
-          <NavItem id="units" icon={Users} label="Units" />
+          <NavItem id="org" icon={Users} label="Org Chart" />
           {isAdmin && <NavItem id="admin" icon={Shield} label="Admin" />}
         </div>
 
@@ -204,7 +204,9 @@ export default function App() {
           ) : view === 'callout' ? (
             <Callout ctx={ctx} />
           ) : view === 'units' ? (
-            <Units ctx={ctx} />
+            <OrgChart ctx={ctx} />
+          ) : view === 'org' ? (
+            <OrgChart ctx={ctx} />
           ) : view === 'admin' ? (
             <Admin ctx={ctx} />
           ) : null}
