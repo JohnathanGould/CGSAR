@@ -12,7 +12,7 @@ export async function loadAll() {
       supabase.from('unit_members').select('*').order('sort_order'),
       supabase.from('item_checkouts').select('*').is('checked_in_at', null),
       supabase.from('user_teams').select('*'),
-      supabase.from('profiles').select('id, display_name, is_admin'),
+      supabase.from('profiles').select('id, first_name, last_name, is_admin, is_approved, created_at'),
     ])
 
   const firstErr = [teams, rooms, containers, items].find((r) => r.error)
@@ -118,6 +118,13 @@ export async function setUserTeams(userId, teamIds) {
   if (del.error) return del
   if (!teamIds.length) return { error: null }
   return supabase.from('user_teams').insert(teamIds.map((team_id) => ({ user_id: userId, team_id })))
+}
+
+// Approve a pending member and assign their team(s) in one step.
+export async function approveMember(userId, teamIds) {
+  const up = await supabase.from('profiles').update({ is_approved: true }).eq('id', userId)
+  if (up.error) return up
+  return setUserTeams(userId, teamIds)
 }
 
 // ---- Units + members (admin) ----

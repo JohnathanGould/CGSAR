@@ -24,9 +24,11 @@ Create a login from the app (Sign in → Create account). Then run this once in 
 replacing the email:
 
 ```sql
-update public.profiles set is_admin = true
+update public.profiles set is_admin = true, is_approved = true
 where id = (select id from auth.users where email = 'you@example.com');
 ```
+
+Admins bypass the approval gate. Everyone else signs up, lands on a "pending admin approval" screen, and gets in once an admin approves them (and assigns their team[s]) from **Admin → Pending**.
 
 Admins can create/edit rooms & teams, assign team memberships, reassign container ownership,
 and manage the Units roster.

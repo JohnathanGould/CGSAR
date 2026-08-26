@@ -67,6 +67,7 @@ export default function App() {
   // ---- derived perms ----
   const profile = session ? data.profiles.find((p) => p.id === session.user.id) : null
   const isAdmin = !!profile?.is_admin
+  const isApproved = isAdmin || !!profile?.is_approved
   const userId = session?.user?.id || null
   const myTeamIds = useMemo(
     () => (session ? data.userTeams.filter((ut) => ut.user_id === session.user.id).map((ut) => ut.team_id) : []),
@@ -74,7 +75,8 @@ export default function App() {
   )
   const canEditContainer = (c) => !!session && (isAdmin || (c && myTeamIds.includes(c.team_id)))
   const teamName = (id) => data.teams.find((t) => t.id === id)?.name || null
-  const profileName = (id) => data.profiles.find((p) => p.id === id)?.display_name || 'a member'
+  const fullName = (p) => p ? [p.first_name, p.last_name].filter(Boolean).join(' ').trim() : ''
+  const profileName = (id) => { const p = data.profiles.find((x) => x.id === id); return (p && fullName(p)) || 'a member' }
 
   // ---- navigation ----
   const openRoom = (roomId) => { setView('floorplan'); setDrawer({ open: true, mode: 'room', roomId, containerId: null, itemId: null }) }
@@ -160,8 +162,8 @@ export default function App() {
         <div id="authbox">
           {session ? (
             <>
-              <div className="who">{profile?.display_name || session.user.email}</div>
-              <div className="role">{isAdmin ? 'Admin' : (myTeamIds.length ? myTeamIds.map(teamName).filter(Boolean).join(', ') : 'Member — no team yet')}</div>
+              <div className="who">{fullName(profile) || session.user.email}</div>
+              <div className="role">{isAdmin ? 'Admin' : (isApproved ? (myTeamIds.length ? myTeamIds.map(teamName).filter(Boolean).join(', ') : 'Member — no team yet') : 'Pending approval')}</div>
               <button className="btn sm block" style={{ marginTop: 10 }} onClick={async () => { await supabase.auth.signOut() }}><LogOut size={13} /> Sign out</button>
             </>
           ) : (
@@ -187,6 +189,13 @@ export default function App() {
             <div className="card" style={{ maxWidth: 560 }}>
               <h3>Can’t reach the database</h3>
               <p className="hint">Run <b>supabase_migrations.sql</b> in your Supabase SQL editor and confirm the URL/anon key. Error: {String(loadError.message || loadError)}</p>
+            </div>
+          ) : (session && !isApproved) ? (
+            <div className="card" style={{ maxWidth: 520, textAlign: 'center', margin: '60px auto' }}>
+              <div style={{ fontSize: 34, marginBottom: 10 }}>⏳</div>
+              <h3 style={{ justifyContent: 'center' }}>Your account is pending admin approval</h3>
+              <p className="hint">Thanks{fullName(profile) ? ', ' + fullName(profile) : ''}. An executive/admin member needs to approve your account and assign your team(s) before you can use the app. You’ll get in automatically once approved — just sign in again.</p>
+              <button className="btn sm" style={{ marginTop: 14 }} onClick={async () => { await supabase.auth.signOut() }}><LogOut size={13} /> Sign out</button>
             </div>
           ) : view === 'dashboard' ? (
             <Dashboard ctx={ctx} />
@@ -214,30 +223,43 @@ function AuthModal({ onClose }) {
   const [mode, setMode] = useState('signin')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-  const [displayName, setDisplayName] = useState('')
+  const [firstName, setFirstName] = useState('')
+  const [lastName, setLastName] = useState('')
   const [msg, setMsg] = useState('')
   const [busy, setBusy] = useState(false)
 
   async function submit() {
-    setBusy(true); setMsg('')
+    setMsg('')
     if (mode === 'signin') {
+      setBusy(true)
       const { error } = await supabase.auth.signInWithPassword({ email, password })
       setBusy(false)
       if (error) setMsg(error.message); else onClose()
     } else {
-      const { data, error } = await supabase.auth.signUp({ email, password, options: { data: { display_name: displayName } } })
+      if (!firstName.trim() || !lastName.trim()) { setMsg('First and last name are required.'); return }
+      setBusy(true)
+      const { data, error } = await supabase.auth.signUp({
+        email, password,
+        options: { data: { first_name: firstName.trim(), last_name: lastName.trim() } },
+      })
       setBusy(false)
       if (error) { setMsg(error.message); return }
       if (data.session) onClose()
-      else setMsg('Account created. If email confirmation is on, confirm via email, then sign in. An admin then assigns your team(s).')
+      else setMsg('Account created. If email confirmation is on, confirm via email, then sign in. Your account then waits for admin approval.')
     }
   }
 
   return (
     <Modal title={mode === 'signin' ? 'Sign in' : 'Create account'} sub="Members log in to edit their team’s shelves." onClose={onClose}>
-      {mode === 'signup' && <div className="field"><label>Display name</label><input value={displayName} onChange={(e) => setDisplayName(e.target.value)} placeholder="Your name" /></div>}
-      <div className="field"><label>Email</label><input value={email} onChange={(e) => setEmail(e.target.value)} autoFocus /></div>
+      {mode === 'signup' && (
+        <div className="formRow">
+          <div className="field"><label>First name</label><input value={firstName} onChange={(e) => setFirstName(e.target.value)} autoFocus /></div>
+          <div className="field"><label>Last name</label><input value={lastName} onChange={(e) => setLastName(e.target.value)} /></div>
+        </div>
+      )}
+      <div className="field"><label>Email</label><input value={email} onChange={(e) => setEmail(e.target.value)} /></div>
       <div className="field"><label>Password</label><input type="password" value={password} onChange={(e) => setPassword(e.target.value)} /></div>
+      {mode === 'signup' && <div className="hint">New accounts need admin approval before access is granted.</div>}
       {msg && <div className="hint">{msg}</div>}
       <div className="formActions">
         <button className="btn ghost" onClick={() => { setMode(mode === 'signin' ? 'signup' : 'signin'); setMsg('') }}>{mode === 'signin' ? 'Create account' : 'Have an account? Sign in'}</button>

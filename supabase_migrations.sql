@@ -11,8 +11,11 @@ create extension if not exists pgcrypto;
 -- ---------------------------------------------------------------------
 create table if not exists public.profiles (
   id           uuid primary key references auth.users(id) on delete cascade,
-  display_name text,
-  is_admin     boolean not null default false
+  first_name   text,
+  last_name    text,
+  is_admin     boolean not null default false,
+  is_approved  boolean not null default false,
+  created_at   timestamptz not null default now()
 );
 
 create table if not exists public.teams (
@@ -100,6 +103,13 @@ create index if not exists checkouts_item_idx on public.item_checkouts(item_id);
 alter table public.items add column if not exists min_qty int not null default 0;
 alter table public.items add column if not exists photo_url text;
 
+-- profiles: name capture + approval gate (safe to re-run)
+alter table public.profiles add column if not exists first_name text;
+alter table public.profiles add column if not exists last_name text;
+alter table public.profiles add column if not exists is_approved boolean not null default false;
+alter table public.profiles add column if not exists created_at timestamptz not null default now();
+alter table public.profiles drop column if exists display_name;
+
 -- ---------------------------------------------------------------------
 -- STORAGE: public bucket for item photos
 -- ---------------------------------------------------------------------
@@ -135,10 +145,11 @@ for each row execute function public.set_updated_at();
 create or replace function public.handle_new_user()
 returns trigger language plpgsql security definer set search_path = public as $$
 begin
-  insert into public.profiles (id, display_name, is_admin)
+  insert into public.profiles (id, first_name, last_name, is_admin, is_approved)
   values (new.id,
-          coalesce(new.raw_user_meta_data->>'display_name', split_part(new.email, '@', 1)),
-          false)
+          new.raw_user_meta_data->>'first_name',
+          new.raw_user_meta_data->>'last_name',
+          false, false)
   on conflict (id) do nothing;
   return new;
 end; $$;

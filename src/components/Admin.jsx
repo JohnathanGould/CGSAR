@@ -1,29 +1,75 @@
 import React, { useState } from 'react'
-import { Plus, Trash2, Save, Download, QrCode } from 'lucide-react'
+import { Plus, Trash2, Save, Download, QrCode, UserCheck } from 'lucide-react'
 import * as api from '../lib/data'
 import { exportInventoryCsv, printAllQrTags } from '../lib/exports'
+import { fmtDate } from '../lib/helpers'
 import Modal from './Modal'
+
+const fullName = (p) => [p.first_name, p.last_name].filter(Boolean).join(' ').trim() || '(no name)'
 
 export default function Admin({ ctx }) {
   const { data, refresh } = ctx
-  const [tab, setTab] = useState('rooms')
+  const pendingCount = data.profiles.filter((p) => !p.is_approved && !p.is_admin).length
+  const [tab, setTab] = useState(pendingCount > 0 ? 'pending' : 'rooms')
   const done = async (r) => { if (r && r.error) alert(r.error.message); await refresh() }
+
+  const label = { pending: `Pending${pendingCount ? ` (${pendingCount})` : ''}`, rooms: 'Rooms', teams: 'Teams', members: 'Members' }
 
   return (
     <div>
-      <div className="pageHead"><h2>Admin</h2><p>Structure the base: rooms, teams, and who can edit what.</p></div>
+      <div className="pageHead"><h2>Admin</h2><p>Structure the base: approvals, rooms, teams, and who can edit what.</p></div>
       <div className="rowActions" style={{ margin: '0 0 18px' }}>
         <button className="btn" onClick={() => exportInventoryCsv(data)}><Download size={14} /> Export inventory CSV</button>
         <button className="btn" onClick={() => printAllQrTags(data)}><QrCode size={14} /> Print all QR tags</button>
       </div>
       <div className="tabs">
-        {['rooms', 'teams', 'members'].map((t) => (
-          <button key={t} className={'tab' + (tab === t ? ' active' : '')} onClick={() => setTab(t)}>{t[0].toUpperCase() + t.slice(1)}</button>
+        {['pending', 'rooms', 'teams', 'members'].map((t) => (
+          <button key={t} className={'tab' + (tab === t ? ' active' : '')} onClick={() => setTab(t)}>{label[t]}</button>
         ))}
       </div>
+      {tab === 'pending' && <Pending data={data} refresh={refresh} />}
       {tab === 'rooms' && <Rooms data={data} done={done} refresh={refresh} />}
       {tab === 'teams' && <Teams data={data} done={done} refresh={refresh} />}
       {tab === 'members' && <Members data={data} refresh={refresh} />}
+    </div>
+  )
+}
+
+function Pending({ data, refresh }) {
+  const [draft, setDraft] = useState({}) // userId -> Set(teamId)
+  const [busy, setBusy] = useState(null)
+  const pending = data.profiles.filter((p) => !p.is_approved && !p.is_admin)
+    .sort((a, b) => new Date(a.created_at || 0) - new Date(b.created_at || 0))
+
+  const teamsFor = (uid) => draft[uid] || new Set()
+  const toggle = (uid, tid) => {
+    const s = new Set(teamsFor(uid))
+    if (s.has(tid)) s.delete(tid); else s.add(tid)
+    setDraft({ ...draft, [uid]: s })
+  }
+  const approve = async (uid) => {
+    setBusy(uid)
+    const r = await api.approveMember(uid, Array.from(teamsFor(uid)))
+    setBusy(null)
+    if (r && r.error) alert(r.error.message)
+    await refresh()
+  }
+
+  if (pending.length === 0) return <div className="hint">No members waiting for approval.</div>
+  return (
+    <div>
+      <div className="hint" style={{ marginBottom: 14 }}>Tick the team(s) each new member should be able to edit, then Approve — that flips them to approved and assigns teams in one step.</div>
+      {pending.map((p) => (
+        <div key={p.id} className="card" style={{ marginBottom: 14 }}>
+          <h3>{fullName(p)} <span className="count">signed up {fmtDate(p.created_at) || '—'}</span></h3>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 14, marginBottom: 12 }}>
+            {data.teams.map((t) => (
+              <label key={t.id} className="checkRow"><input type="checkbox" checked={teamsFor(p.id).has(t.id)} onChange={() => toggle(p.id, t.id)} /> {t.name}</label>
+            ))}
+          </div>
+          <button className="btn accent sm" disabled={busy === p.id} onClick={() => approve(p.id)}><UserCheck size={13} /> {busy === p.id ? 'Approving…' : 'Approve & assign'}</button>
+        </div>
+      ))}
     </div>
   )
 }
@@ -109,13 +155,14 @@ function Members({ data, refresh }) {
     const d = { ...draft }; delete d[uid]; setDraft(d)
   }
 
-  if (data.profiles.length === 0) return <div className="hint">No members have signed up yet.</div>
+  const approved = data.profiles.filter((p) => p.is_approved || p.is_admin)
+  if (approved.length === 0) return <div className="hint">No approved members yet. Approve new sign-ups in the Pending tab.</div>
   return (
     <div>
       <div className="hint" style={{ marginBottom: 14 }}>Tick the teams each member can edit, then Save. Members can edit shelves owned by any of their teams.</div>
-      {data.profiles.map((p) => (
+      {approved.map((p) => (
         <div key={p.id} className="card" style={{ marginBottom: 14 }}>
-          <h3>{p.display_name || p.id} {p.is_admin && <span className="pill roleLead">admin</span>}</h3>
+          <h3>{fullName(p)} {p.is_admin && <span className="pill roleLead">admin</span>}</h3>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 14, marginBottom: 12 }}>
             {data.teams.map((t) => (
               <label key={t.id} className="checkRow"><input type="checkbox" checked={teamsFor(p.id).has(t.id)} onChange={() => toggle(p.id, t.id)} /> {t.name}</label>
