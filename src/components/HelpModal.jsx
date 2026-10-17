@@ -7,12 +7,12 @@ const SECTIONS = [
   ['Taking inventory', 'Open a container you have edit access to, use \u201cTake Inventory,\u201d adjust quantities, and save \u2014 this logs who did it and when. You can review past checks under \u201cView check history.\u201d'],
   ['Signing gear out', 'On any item, use \u201cCheck out\u201d to record who has it and when it\u2019s due back; use \u201cCheck in\u201d when it\u2019s returned.'],
   ['Vehicle SOPs', 'Vehicle/trailer units have an \u201cSOP\u201d tab for setup and takedown procedures \u2014 the same text shown on the Callout cards.'],
-  ['Org chart', 'Browse the association\u2019s structure and rosters; tap any position to see who\u2019s in it.'],
+  ['Org chart', 'See the association\u2019s positions and who fills each one \u2014 vacant positions are marked. Tap a position for details.'],
   ['Logging in', 'Sign up with your name, email, and password. An admin approves new accounts before you get full access.'],
   ['If you\u2019re on a team', 'You can edit items and take inventory for your team\u2019s shelves/units. Everything else stays read-only to you.'],
 ]
 
-const ADMIN_SECTION = ['Admin functions', 'As an admin you can approve pending members, manage rooms/teams/containers, reassign container ownership, and edit the org chart structure.']
+const ADMIN_SECTION = ['Admin functions', 'As an admin you can approve pending members, manage rooms/teams/containers, reassign container ownership, and edit the org chart (add positions and assign who fills them).']
 
 export default function HelpModal({ isAdmin, onClose }) {
   const sections = isAdmin ? [...SECTIONS, ADMIN_SECTION] : SECTIONS
