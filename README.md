@@ -13,6 +13,9 @@ straight to its location.
 1. In your Supabase project, open **SQL Editor → New query**, paste the whole of
    [`supabase_migrations.sql`](./supabase_migrations.sql), and **Run**. This creates all tables,
    RLS policies, and seed data (5 teams, 8 rooms, Vehicle Bays + Medical Room inventory, 3 units).
+   Then do the same with [`supabase_002_vehicle_compartments.sql`](./supabase_002_vehicle_compartments.sql),
+   which adds vehicle compartments (and starter compartments for the RPAS Unit). Both files are safe
+   to re-run, so an existing database only needs the second one.
 2. **Authentication → Providers → Email:** enable Email. For a quick internal tool you can turn
    *Confirm email* OFF so new logins work immediately.
 3. **Authentication → URL Configuration:** set Site URL + a redirect of your GitHub Pages URL, e.g.
@@ -58,6 +61,15 @@ workflow (`.github/workflows/deploy.yml`) builds and publishes `dist/` on every 
   your teams (`user_teams`). Read-only everywhere else.
 - **Admin:** full edit everywhere + rooms/teams CRUD, membership assignment, container team
   reassignment, and the Units roster.
+
+## Vehicle compartments
+
+Vehicle / trailer units can be split into named compartments, each on a side of the unit
+(driver side, passenger side, rear, interior, roof, cab) and ordered front → back. Opening a vehicle
+shows a top-down diagram of the unit; searching for an item lights up the compartment it's in, and
+search results read *RPAS Unit → Driver rear → Generator*. Anyone who can edit the unit (its team or
+an admin) can add, rename, reorder or delete compartments via **Manage compartments**, and pick an
+item's compartment in the item form.
 
 ## Known limitation (v1)
 
