@@ -16,6 +16,9 @@ straight to its location.
    Then do the same with [`supabase_002_vehicle_compartments.sql`](./supabase_002_vehicle_compartments.sql),
    which adds vehicle compartments (and starter compartments for the RPAS Unit). Both files are safe
    to re-run, so an existing database only needs the second one.
+   Optionally, run [`supabase_003_units_roster.sql`](./supabase_003_units_roster.sql) to load the
+   Units/Groups sheet (chiefs, units, leads and members) into the org chart. Re-running it resets
+   those units to match the sheet.
 2. **Authentication → Providers → Email:** enable Email. For a quick internal tool you can turn
    *Confirm email* OFF so new logins work immediately.
 3. **Authentication → URL Configuration:** set Site URL + a redirect of your GitHub Pages URL, e.g.
