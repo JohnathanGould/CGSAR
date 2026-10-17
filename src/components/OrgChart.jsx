@@ -3,6 +3,14 @@ import { Plus, Trash2, Pencil, CornerDownRight, ChevronRight, UserPlus } from 'l
 import * as api from '../lib/data'
 import Modal from './Modal'
 
+// Fixed executive positions: admins can fill them and add sub-units under
+// them, but not rename or delete them.
+const EXECUTIVE_POSITIONS = new Set([
+  'president', 'information', 'safety officer', 'admin chief',
+  'planning chief', 'logistic chief', 'operations chief',
+].map((t) => t.toLowerCase()))
+const isExecutive = (node) => EXECUTIVE_POSITIONS.has(node.title.trim().toLowerCase())
+
 function buildRows(positions) {
   const byParent = {}
   positions.forEach((p) => { const k = p.parent_id || 'root'; (byParent[k] = byParent[k] || []).push(p) })
@@ -62,9 +70,11 @@ export default function OrgChart({ ctx }) {
               {isAdmin ? (
                 <div className="rowActions" style={{ margin: 0 }} onClick={(e) => e.stopPropagation()}>
                   {!membersOf(node.id).length && <button className="btn sm ghost" title="Assign person" onClick={() => { setSelected(node.id); setModal({ type: 'person', positionId: node.id }) }}><UserPlus size={13} /></button>}
-                  <button className="btn sm ghost" title="Add sub-position" onClick={() => setModal({ type: 'addPos', parentId: node.id })}><Plus size={13} /></button>
-                  <button className="btn sm ghost" title="Rename" onClick={() => setModal({ type: 'rename', node })}><Pencil size={13} /></button>
-                  <button className="btn sm danger" title="Delete" onClick={async () => { if (confirm(`Delete "${node.title}" and everything under it?`)) { await done(await api.deletePosition(node.id)); if (selected === node.id) setSelected(null) } }}><Trash2 size={13} /></button>
+                  <button className="btn sm ghost" title="Add sub-unit" onClick={() => setModal({ type: 'addPos', parentId: node.id })}><Plus size={13} /></button>
+                  {!isExecutive(node) && <>
+                    <button className="btn sm ghost" title="Rename" onClick={() => setModal({ type: 'rename', node })}><Pencil size={13} /></button>
+                    <button className="btn sm danger" title="Delete" onClick={async () => { if (confirm(`Delete "${node.title}" and everything under it?`)) { await done(await api.deletePosition(node.id)); if (selected === node.id) setSelected(null) } }}><Trash2 size={13} /></button>
+                  </>}
                 </div>
               ) : <ChevronRight className="lr-arrow" size={16} />}
             </div>
@@ -83,7 +93,7 @@ export default function OrgChart({ ctx }) {
       </div>
 
       {modal?.type === 'addPos' && (
-        <TitleModal title={modal.parentId ? 'Add sub-position' : 'Add top-level position'} onClose={() => setModal(null)}
+        <TitleModal title={modal.parentId ? 'Add sub-unit under ' + (data.orgPositions.find((p) => p.id === modal.parentId)?.title || '') : 'Add top-level position'} onClose={() => setModal(null)}
           onSave={async (t) => { const r = await api.addPosition({ parent_id: modal.parentId, title: t, sort_order: nextSort(data.orgPositions.filter((p) => (p.parent_id || null) === modal.parentId)) }); if (!r.error) { setModal(null); await refresh() } return r }} />
       )}
       {modal?.type === 'rename' && (
