@@ -12,14 +12,15 @@ export function exportInventoryCsv(data) {
   const roomById = Object.fromEntries(data.rooms.map((r) => [r.id, r]))
   const containerById = Object.fromEntries(data.containers.map((c) => [c.id, c]))
   const teamById = Object.fromEntries(data.teams.map((t) => [t.id, t]))
-  const header = ['Room', 'Container', 'Team', 'Item', 'Qty', 'MinQty', 'Location', 'Status', 'ReplaceBy', 'ReplaceNote', 'LastCheckedAt']
+  const compById = Object.fromEntries((data.compartments || []).map((x) => [x.id, x]))
+  const header = ['Room', 'Container', 'Team', 'Item', 'Qty', 'MinQty', 'Compartment', 'Location', 'Status', 'ReplaceBy', 'ReplaceNote', 'LastCheckedAt']
   const rows = [header]
   data.items.forEach((it) => {
     const c = containerById[it.container_id]
     const r = c && roomById[c.room_id]
     rows.push([
       r?.name, c?.name, c && teamById[c.team_id]?.name, it.name, it.qty, it.min_qty,
-      it.loc_detail, it.status, it.needs_replacement_by, it.needs_replacement_note, c?.last_checked_at,
+      compById[it.compartment_id]?.name, it.loc_detail, it.status, it.needs_replacement_by, it.needs_replacement_note, c?.last_checked_at,
     ])
   })
   const csv = rows.map((row) => row.map(csvCell).join(',')).join('\n')

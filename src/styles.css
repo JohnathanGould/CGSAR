@@ -56,6 +56,8 @@ a{color:inherit;text-decoration:none;}
 #topbar .addr{font-size:12.5px;color:var(--muted);}
 .helpBtn{display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;border-radius:50%;border:1px solid var(--line);background:var(--panel-2);color:var(--muted);cursor:pointer;transition:.12s;flex:none;}
 .helpBtn:hover{border-color:var(--accent);color:var(--accent);}
+.linkBtn{background:none;border:0;padding:0;margin:-4px 0 10px;color:var(--accent);font-size:12px;cursor:pointer;}
+.linkBtn:hover{text-decoration:underline;}
 .helpBody{margin-bottom:8px;}
 .helpSection{padding:12px 0;border-bottom:1px solid var(--line);}
 .helpSection:last-child{border-bottom:none;}
@@ -74,6 +76,36 @@ svg#plan{width:100%;max-width:1100px;height:auto;}
 .roomSub{fill:var(--muted);font-size:10px;pointer-events:none;text-anchor:middle;}
 .zoneLabel{fill:var(--muted);font-size:11px;letter-spacing:.08em;text-transform:uppercase;pointer-events:none;}
 .outerWall{fill:none;stroke:var(--line);stroke-width:3;}
+
+/* vehicle diagram (compartments) */
+#vehiclewrap{display:flex;flex-direction:column;align-items:center;}
+svg#vehicle{width:100%;max-width:1100px;height:auto;}
+.vehBody{fill:#121212;stroke:#4a4a4a;stroke-width:2;}
+.wheel{fill:#2a2a2a;stroke:#4a4a4a;stroke-width:1;}
+.compSlot{cursor:pointer;}
+.comp{fill:var(--room);stroke:var(--line);stroke-width:2;transition:fill .12s ease;}
+.compSlot:hover .comp{fill:var(--room-hover);}
+.comp.active{fill:var(--room-active);stroke:var(--accent);stroke-width:2.5;}
+.comp.has-hit{fill:var(--accent-dim);stroke:var(--accent);stroke-width:3;}
+.compEmpty{fill:none;stroke:var(--line);stroke-width:1.5;stroke-dasharray:6 5;}
+.compEmptyText{fill:var(--muted);font-size:15px;text-anchor:middle;pointer-events:none;}
+.compLabel{height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;padding:4px 6px;text-align:center;overflow:hidden;}
+.compName{color:var(--text);font-size:17px;font-weight:700;line-height:1.15;}
+.compCount{color:var(--muted);font-size:13px;}
+.vehicleFoot{margin-top:6px;font-size:13px;color:var(--muted);text-align:center;}
+.vehicleFoot b{color:var(--text);}
+.compHead{display:flex;justify-content:space-between;align-items:baseline;margin:16px 0 8px;font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);font-weight:700;}
+.compHead.hit{color:var(--accent);}
+.chipRow{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px;}
+.chip{padding:4px 10px;border-radius:999px;border:1px solid var(--line);background:var(--panel-2);color:var(--muted);font-size:12px;font-weight:600;cursor:pointer;}
+.chip.active{border-color:var(--accent);color:var(--text);background:var(--room-active);}
+.compRow{display:flex;gap:6px;align-items:center;margin-bottom:6px;}
+
+.compRow input,.compRow select{flex:1;min-width:0;background:var(--bg);border:1px solid var(--line);color:var(--text);padding:7px 9px;border-radius:6px;font-size:13px;outline:none;font-family:inherit;}
+.compRow input:focus,.compRow select:focus{border-color:var(--accent);}
+.compRow input:first-child{flex:2;}
+.compRow input.num{flex:0 0 56px;}
+svg#vehicle .zoneLabel{font-size:14px;}
 
 /* ---------- drawer ---------- */
 #drawer{position:relative;z-index:2;width:0;min-width:0;background:var(--panel);border-left:1px solid var(--line);

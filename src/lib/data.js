@@ -2,7 +2,7 @@ import { supabase } from './supabase'
 
 // ---- Load everything the SPA needs in one round-trip ----
 export async function loadAll() {
-  const [teams, rooms, containers, items, orgPositions, orgMembers, checkouts, userTeams, profiles] =
+  const [teams, rooms, containers, items, orgPositions, orgMembers, checkouts, userTeams, profiles, compartments] =
     await Promise.all([
       supabase.from('teams').select('*').order('name'),
       supabase.from('rooms').select('*').order('sort_order'),
@@ -13,6 +13,8 @@ export async function loadAll() {
       supabase.from('item_checkouts').select('*').is('checked_in_at', null),
       supabase.from('user_teams').select('*'),
       supabase.from('profiles').select('id, first_name, last_name, is_admin, is_approved, created_at'),
+      // Missing until supabase_002_vehicle_compartments.sql is run; treated as empty.
+      supabase.from('compartments').select('*').order('sort_order'),
     ])
 
   const firstErr = [teams, rooms, containers, items].find((r) => r.error)
@@ -28,6 +30,7 @@ export async function loadAll() {
     checkouts: checkouts.data || [],
     userTeams: userTeams.data || [],
     profiles: profiles.data || [],
+    compartments: compartments.data || [],
   }
 }
 
@@ -102,6 +105,11 @@ export async function saveSOP(id, patch, userId) {
     .update({ ...patch, sop_updated_at: new Date().toISOString(), sop_updated_by: userId || null })
     .eq('id', id)
 }
+
+// ---- Vehicle compartments ----
+export async function addCompartment(payload) { return supabase.from('compartments').insert(payload) }
+export async function updateCompartment(id, patch) { return supabase.from('compartments').update(patch).eq('id', id) }
+export async function deleteCompartment(id) { return supabase.from('compartments').delete().eq('id', id) }
 
 // ---- Checkouts ----
 export async function checkoutItem(itemId, payload) {

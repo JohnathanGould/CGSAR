@@ -1,15 +1,17 @@
 import React, { useEffect, useState } from 'react'
 import {
   X, ChevronRight, Plus, Pencil, Trash2, ClipboardCheck, PackageOpen,
-  LogOut, LogIn, Save, QrCode, Camera, History,
+  LogOut, LogIn, Save, QrCode, Camera, History, Truck,
 } from 'lucide-react'
 import { replacementBadge, fmtDate, fmtDateTime, lowStock } from '../lib/helpers'
 import * as api from '../lib/data'
+import { SIDES, compartmentsOf, compartmentLabel } from '../lib/compartments'
 import QRModal from './QRModal'
 
 /* ------------------------- small forms ------------------------- */
-function ItemForm({ initial, onCancel, onSave }) {
+function ItemForm({ initial, compartments = [], defaultCompartmentId, onCancel, onSave }) {
   const [f, setF] = useState({
+    compartment_id: initial ? (initial.compartment_id || '') : (defaultCompartmentId || ''),
     name: initial?.name || '', qty: initial?.qty ?? 1, min_qty: initial?.min_qty ?? 0,
     loc_detail: initial?.loc_detail || '', status: initial?.status || 'Available',
     needs_replacement_by: initial?.needs_replacement_by || '',
@@ -27,6 +29,9 @@ function ItemForm({ initial, onCancel, onSave }) {
       needs_replacement_by: f.needs_replacement_by || null,
       needs_replacement_note: f.needs_replacement_note.trim() || null,
     }
+    // Only send compartment_id when the unit has compartments, so saving still
+    // works on a database that hasn't run the compartments migration yet.
+    if (compartments.length) payload.compartment_id = f.compartment_id || null
     const { error } = await onSave(payload)
     setBusy(false)
     if (error) setErr(error.message)
@@ -39,7 +44,16 @@ function ItemForm({ initial, onCancel, onSave }) {
         <div className="field"><label>Low-stock min</label><input type="number" value={f.min_qty} onChange={up('min_qty')} /></div>
         <div className="field"><label>Status</label><input value={f.status} onChange={up('status')} placeholder="Available" /></div>
       </div>
-      <div className="field"><label>Location detail</label><input value={f.loc_detail} onChange={up('loc_detail')} placeholder="e.g. Bin 3, upper shelf" /></div>
+      {compartments.length > 0 && (
+        <div className="field">
+          <label>Compartment</label>
+          <select value={f.compartment_id} onChange={up('compartment_id')}>
+            <option value="">— not assigned —</option>
+            {compartments.map((c) => <option key={c.id} value={c.id}>{compartmentLabel(c)}</option>)}
+          </select>
+        </div>
+      )}
+      <div className="field"><label>Location detail</label><input value={f.loc_detail} onChange={up('loc_detail')} placeholder={compartments.length ? 'e.g. Top shelf, black Pelican case' : 'e.g. Bin 3, upper shelf'} /></div>
       <div className="formRow">
         <div className="field"><label>Needs replacement by</label><input type="date" value={f.needs_replacement_by || ''} onChange={up('needs_replacement_by')} /></div>
         <div className="field"><label>Replacement note</label><input value={f.needs_replacement_note} onChange={up('needs_replacement_note')} placeholder="e.g. chain worn" /></div>
@@ -107,11 +121,64 @@ function ContainerForm({ teams, allowedTeamIds, isAdmin, onCancel, onSave }) {
   )
 }
 
+function CompartmentRow({ comp, onSave, onDelete }) {
+  const [f, setF] = useState({ name: comp.name, side: comp.side, sort_order: comp.sort_order })
+  const dirty = f.name !== comp.name || f.side !== comp.side || String(f.sort_order) !== String(comp.sort_order)
+  return (
+    <div className="compRow">
+      <input value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} />
+      <select value={f.side} onChange={(e) => setF({ ...f, side: e.target.value })}>
+        {SIDES.map((s) => <option key={s.id} value={s.id}>{s.label}</option>)}
+      </select>
+      <input className="num" type="number" title="Order (1 = front-most)" value={f.sort_order} onChange={(e) => setF({ ...f, sort_order: e.target.value })} />
+      {dirty
+        ? <button className="btn sm accent" disabled={!f.name.trim()} onClick={() => onSave({ name: f.name.trim(), side: f.side, sort_order: parseInt(f.sort_order, 10) || 0 })}><Save size={13} /></button>
+        : <button className="btn sm danger" title="Delete compartment" onClick={onDelete}><Trash2 size={13} /></button>}
+    </div>
+  )
+}
+
+function CompartmentEditor({ container, compartments, items, onChange }) {
+  const [name, setName] = useState('')
+  const [side, setSide] = useState('driver')
+  const [err, setErr] = useState('')
+  const run = async (r) => { if (r.error) setErr(r.error.message); else { setErr(''); await onChange() } }
+  async function add() {
+    if (!name.trim()) { setErr('Give the compartment a name'); return }
+    const order = compartments.filter((c) => c.side === side).reduce((m, c) => Math.max(m, c.sort_order || 0), 0) + 1
+    await run(await api.addCompartment({ container_id: container.id, name: name.trim(), side, sort_order: order }))
+    setName('')
+  }
+  return (
+    <div>
+      <p className="hint" style={{ marginTop: 0 }}>Name each door or area the way the team says it on a callout. Order runs front → back (1 = closest to the cab).</p>
+      {compartments.length === 0 && <div className="hint">No compartments yet.</div>}
+      {compartments.map((c) => (
+        <CompartmentRow key={c.id + ':' + c.name + ':' + c.side + ':' + c.sort_order} comp={c}
+          onSave={async (patch) => run(await api.updateCompartment(c.id, patch))}
+          onDelete={async () => {
+            const n = items.filter((i) => i.compartment_id === c.id).length
+            if (confirm(`Delete “${c.name}”?` + (n ? ` Its ${n} item${n === 1 ? '' : 's'} will stay on the unit as “not assigned”.` : ''))) run(await api.deleteCompartment(c.id))
+          }} />
+      ))}
+      <p className="sectionLabel" style={{ marginTop: 16 }}>Add compartment</p>
+      <div className="compRow">
+        <input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Rear upper" onKeyDown={(e) => { if (e.key === 'Enter') add() }} />
+        <select value={side} onChange={(e) => setSide(e.target.value)}>
+          {SIDES.map((s) => <option key={s.id} value={s.id}>{s.label}</option>)}
+        </select>
+        <button className="btn sm accent" onClick={add}><Plus size={13} /> Add</button>
+      </div>
+      {err && <div className="errText">{err}</div>}
+    </div>
+  )
+}
+
 /* ------------------------- main drawer ------------------------- */
 export default function DetailDrawer({ ctx, drawer }) {
   const {
     data, session, userId, isAdmin, myTeamIds, canEditContainer, teamName, profileName,
-    refresh, openRoom, openContainer, openItem, openInventory, closeDrawer,
+    refresh, openRoom, openContainer, openItem, openInventory, closeDrawer, selectCompartment,
   } = ctx
 
   const [tab, setTab] = useState('items')
@@ -129,7 +196,14 @@ export default function DetailDrawer({ ctx, drawer }) {
   const container = data.containers.find((c) => c.id === drawer.containerId)
   const item = data.items.find((i) => i.id === drawer.itemId)
   const containersOfRoom = data.containers.filter((c) => c.room_id === drawer.roomId)
-  const itemsOfContainer = data.items.filter((i) => i.container_id === drawer.containerId)
+  const compartments = compartmentsOf(data, drawer.containerId)
+  const compById = Object.fromEntries(compartments.map((c) => [c.id, c]))
+  const compRank = Object.fromEntries(compartments.map((c, i) => [c.id, i]))
+  // Vehicle units list items in walk-around order (by compartment), others by name.
+  const itemsOfContainer = data.items
+    .filter((i) => i.container_id === drawer.containerId)
+    .sort((a, b) => (compRank[a.compartment_id] ?? 1e9) - (compRank[b.compartment_id] ?? 1e9))
+  const selectedComp = compById[drawer.compartmentId] || null
   const canEdit = canEditContainer(container)
 
   useEffect(() => { setTab('items') }, [drawer.containerId])
@@ -153,6 +227,16 @@ export default function DetailDrawer({ ctx, drawer }) {
     setHistOpen(true)
   }
 
+  // Must stay above the early return below: hooks can't be skipped between renders.
+  useEffect(() => {
+    if (drawer.mode === 'item' && drawer.itemId) {
+      api.getCheckoutHistory(drawer.itemId).then((r) => setHistory(r.data || []))
+    } else {
+      setHistory([])
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [drawer.mode, drawer.itemId, data.checkouts])
+
   if (!drawer.open) {
     return (
       <div id="drawer">
@@ -163,15 +247,6 @@ export default function DetailDrawer({ ctx, drawer }) {
 
   const err = (r) => { if (r && r.error) alert(r.error.message) }
   const done = async (r) => { err(r); await refresh() }
-
-  useEffect(() => {
-    if (drawer.mode === 'item' && drawer.itemId) {
-      api.getCheckoutHistory(drawer.itemId).then((r) => setHistory(r.data || []))
-    } else {
-      setHistory([])
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [drawer.mode, drawer.itemId, data.checkouts])
 
   async function handlePhoto(e) {
     const file = e.target.files && e.target.files[0]
@@ -276,32 +351,60 @@ export default function DetailDrawer({ ctx, drawer }) {
     )
   }
 
+  function renderItemRow(it) {
+    const badge = replacementBadge(it.needs_replacement_by)
+    const co = data.checkouts.find((x) => x.item_id === it.id)
+    return (
+      <div key={it.id} className="item" onClick={() => openItem(drawer.roomId, drawer.containerId, it.id)}>
+        <div className="itop">
+          <span className="iname">{it.name}{badge && <span className={'badge ' + badge.kind} style={{ marginLeft: 8 }}>{badge.label}</span>}{lowStock(it) && <span className="badge low" style={{ marginLeft: 8 }}>Low stock</span>}</span>
+          <span className="iqty">×{it.qty}</span>
+        </div>
+        <div className="iloc">{it.loc_detail || (compartments.length ? '' : 'No location detail')}</div>
+        {it.status && <span className="istatus">{it.status}</span>}
+        {co && <span className="badge soon" style={{ marginLeft: 8 }}>Out: {co.checked_out_by}</span>}
+      </div>
+    )
+  }
+
+  // Vehicle with compartments: chips to pick one, items grouped by compartment.
+  function renderCompartmentItems() {
+    const groups = [...compartments.map((c) => ({ comp: c, items: itemsOfContainer.filter((i) => i.compartment_id === c.id) })),
+      { comp: null, items: itemsOfContainer.filter((i) => !compById[i.compartment_id]) }]
+    const shown = selectedComp ? groups.filter((g) => g.comp?.id === selectedComp.id) : groups.filter((g) => g.comp || g.items.length)
+    return (
+      <>
+        <div className="chipRow">
+          <button className={'chip' + (!selectedComp ? ' active' : '')} onClick={() => selectCompartment(null)}>Whole unit</button>
+          {compartments.map((c) => (
+            <button key={c.id} className={'chip' + (selectedComp?.id === c.id ? ' active' : '')} onClick={() => selectCompartment(c.id)}>{c.name}</button>
+          ))}
+        </div>
+        {shown.map(({ comp, items }) => (
+          <div key={comp ? comp.id : 'none'}>
+            <div className="compHead"><span>{comp ? compartmentLabel(comp) : 'Not assigned to a compartment'}</span><span>{items.length}</span></div>
+            {items.length === 0 ? <div className="hint" style={{ marginBottom: 8 }}>Empty.</div> : items.map(renderItemRow)}
+          </div>
+        ))}
+      </>
+    )
+  }
+
   function renderItemsList() {
     return (
       <>
         {canEdit && itemsOfContainer.length > 0 && (
           <button className="btn accent block" style={{ marginBottom: 12 }} onClick={() => openInventory(drawer.roomId, drawer.containerId)}><ClipboardCheck size={15} /> Take Inventory</button>
         )}
-        {itemsOfContainer.length === 0 ? (
+        {container?.is_vehicle_unit && canEdit && (
+          <button className="btn sm block" style={{ marginBottom: 12 }} onClick={() => setModal({ type: 'compartments' })}><Truck size={13} /> {compartments.length ? 'Manage compartments' : 'Set up compartments'}</button>
+        )}
+        {compartments.length > 0 ? renderCompartmentItems() : itemsOfContainer.length === 0 ? (
           <div className="emptyState"><div className="big">📦</div>Nothing logged yet in {container?.name}.</div>
         ) : (
-          itemsOfContainer.map((it) => {
-            const badge = replacementBadge(it.needs_replacement_by)
-            const co = data.checkouts.find((x) => x.item_id === it.id)
-            return (
-              <div key={it.id} className="item" onClick={() => openItem(drawer.roomId, drawer.containerId, it.id)}>
-                <div className="itop">
-                  <span className="iname">{it.name}{badge && <span className={'badge ' + badge.kind} style={{ marginLeft: 8 }}>{badge.label}</span>}{lowStock(it) && <span className="badge low" style={{ marginLeft: 8 }}>Low stock</span>}</span>
-                  <span className="iqty">×{it.qty}</span>
-                </div>
-                <div className="iloc">{it.loc_detail || 'No location detail'}</div>
-                {it.status && <span className="istatus">{it.status}</span>}
-                {co && <span className="badge soon" style={{ marginLeft: 8 }}>Out: {co.checked_out_by}</span>}
-              </div>
-            )
-          })
+          itemsOfContainer.map(renderItemRow)
         )}
-        {canEdit && <button className="btn dashed block" style={{ marginTop: 6 }} onClick={() => setModal({ type: 'addItem' })}><Plus size={14} /> Add item</button>}
+        {canEdit && <button className="btn dashed block" style={{ marginTop: 6 }} onClick={() => setModal({ type: 'addItem' })}><Plus size={14} /> Add item{selectedComp ? ' to ' + selectedComp.name : ''}</button>}
       </>
     )
   }
@@ -331,7 +434,7 @@ export default function DetailDrawer({ ctx, drawer }) {
         <div id="drawerHead">
           <button className="drawerBack" onClick={() => openContainer(drawer.roomId, drawer.containerId)}>‹ {container?.name}</button>
           <button className="drawerClose" onClick={closeDrawer}><X size={18} /></button>
-          <div className="eyebrow">{room?.name} → {container?.name}</div>
+          <div className="eyebrow">{container?.is_vehicle_unit ? container?.name : room?.name + ' → ' + container?.name}{compById[item.compartment_id] ? ' → ' + compById[item.compartment_id].name : ''}</div>
           <h3>{item.name}</h3>
         </div>
         <div id="drawerBody">
@@ -344,6 +447,7 @@ export default function DetailDrawer({ ctx, drawer }) {
           )}
           <div className="kv"><span className="k">Quantity</span><span className="v" style={{ color: lowStock(item) ? 'var(--overdue)' : 'var(--ok)' }}>×{item.qty} {lowStock(item) && <span className="badge low">Low stock</span>}</span></div>
           {item.min_qty > 0 && <div className="kv"><span className="k">Low-stock min</span><span className="v">{item.min_qty}</span></div>}
+          {compById[item.compartment_id] && <div className="kv"><span className="k">Compartment</span><span className="v">{compartmentLabel(compById[item.compartment_id])}</span></div>}
           <div className="kv"><span className="k">Location</span><span className="v">{item.loc_detail || '—'}</span></div>
           <div className="kv"><span className="k">Status</span><span className="v">{item.status || '—'}</span></div>
 
@@ -406,7 +510,7 @@ export default function DetailDrawer({ ctx, drawer }) {
           ) : itemsOfContainer.map((it) => (
             <div key={it.id} className="item" style={{ cursor: 'default' }}>
               <div className="itop"><span className="iname">{it.name}</span></div>
-              <div className="iloc">{it.loc_detail || '—'}</div>
+              <div className="iloc">{[compById[it.compartment_id]?.name, it.loc_detail].filter(Boolean).join(' · ') || '—'}</div>
               <div className="field" style={{ margin: '8px 0 0' }}>
                 <input type="number" disabled={!canEdit} value={invDraft[it.id] ?? it.qty}
                   onChange={(e) => setInvDraft({ ...invDraft, [it.id]: e.target.value })} />
@@ -464,13 +568,13 @@ export default function DetailDrawer({ ctx, drawer }) {
 
       {modal?.type === 'addItem' && (
         <ModalWrap title="Add item" onClose={() => setModal(null)}>
-          <ItemForm onCancel={() => setModal(null)} onSave={async (p) => { const r = await api.saveItem({ ...p, container_id: drawer.containerId }, userId); if (!r.error) { setModal(null); await refresh() } return r }} />
+          <ItemForm compartments={compartments} defaultCompartmentId={drawer.compartmentId} onCancel={() => setModal(null)} onSave={async (p) => { const r = await api.saveItem({ ...p, container_id: drawer.containerId }, userId); if (!r.error) { setModal(null); await refresh() } return r }} />
         </ModalWrap>
       )}
 
       {modal?.type === 'editItem' && (
         <ModalWrap title="Edit item" onClose={() => setModal(null)}>
-          <ItemForm initial={modal.item} onCancel={() => setModal(null)} onSave={async (p) => { const r = await api.saveItem({ ...p, id: modal.item.id }, userId); if (!r.error) { setModal(null); await refresh() } return r }} />
+          <ItemForm initial={modal.item} compartments={compartments} onCancel={() => setModal(null)} onSave={async (p) => { const r = await api.saveItem({ ...p, id: modal.item.id }, userId); if (!r.error) { setModal(null); await refresh() } return r }} />
         </ModalWrap>
       )}
 
@@ -487,6 +591,11 @@ export default function DetailDrawer({ ctx, drawer }) {
             const r = await api.addContainer({ ...p, room_id: drawer.roomId, sort_order: sort })
             if (!r.error) { setModal(null); await refresh() } return r
           }} />
+        </ModalWrap>
+      )}
+      {modal?.type === 'compartments' && container && (
+        <ModalWrap title={'Compartments — ' + container.name} onClose={() => setModal(null)}>
+          <CompartmentEditor container={container} compartments={compartments} items={itemsOfContainer} onChange={refresh} />
         </ModalWrap>
       )}
       {modal?.type === 'qr' && container && (
