@@ -168,4 +168,4 @@ export async function updatePosition(id, patch) { return supabase.from('org_posi
 export async function deletePosition(id) { return supabase.from('org_positions').delete().eq('id', id) }
 export async function addPositionMember(payload) { return supabase.from('org_position_members').insert(payload) }
 export async function deletePositionMember(id) { return supabase.from('org_position_members').delete().eq('id', id) }
-export async function updatePositionMemberRole(id, role) { return supabase.from('org_position_members').update({ role }).eq('id', id) }
+export async function updatePositionMember(id, patch) { return supabase.from('org_position_members').update(patch).eq('id', id) }
