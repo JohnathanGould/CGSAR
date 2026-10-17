@@ -7,7 +7,7 @@ const SECTIONS = [
   ['Taking inventory', 'Open a container you have edit access to, use \u201cTake Inventory,\u201d adjust quantities, and save \u2014 this logs who did it and when. You can review past checks under \u201cView check history.\u201d'],
   ['Signing gear out', 'On any item, use \u201cCheck out\u201d to record who has it and when it\u2019s due back; use \u201cCheck in\u201d when it\u2019s returned.'],
   ['Vehicle SOPs', 'Vehicle/trailer units have an \u201cSOP\u201d tab for setup and takedown procedures \u2014 the same text shown on the Callout cards.'],
-  ['Org chart', 'See the association\u2019s positions and who fills each one \u2014 vacant positions are marked. Tap a position for details.'],
+  ['Org chart', 'See the association\u2019s executive positions (who fills each one, or vacant) and its units (lead and members). Tap any one for details.'],
   ['Logging in', 'Sign up with your name, email, and password. An admin approves new accounts before you get full access.'],
   ['If you\u2019re on a team', 'You can edit items and take inventory for your team\u2019s shelves/units. Everything else stays read-only to you.'],
 ]
