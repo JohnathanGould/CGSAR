@@ -31,6 +31,8 @@ export default function App() {
   const [query, setQuery] = useState('')
   const [authOpen, setAuthOpen] = useState(false)
   const [helpOpen, setHelpOpen] = useState(false)
+  // Admin-only preview: 'self' | 'member' | 'team:<id>' | 'public'
+  const [viewAs, setViewAs] = useState('self')
   const [recoveryOpen, setRecoveryOpen] = useState(false)
   const deepLinkDone = React.useRef(false)
 
@@ -75,14 +77,20 @@ export default function App() {
 
   // ---- derived perms ----
   const profile = session ? data.profiles.find((p) => p.id === session.user.id) : null
-  const isAdmin = !!profile?.is_admin
-  const isApproved = isAdmin || !!profile?.is_approved
-  const userId = session?.user?.id || null
-  const myTeamIds = useMemo(
+  const realIsAdmin = !!profile?.is_admin
+  const isApproved = realIsAdmin || !!profile?.is_approved
+  const realTeamIds = useMemo(
     () => (session ? data.userTeams.filter((ut) => ut.user_id === session.user.id).map((ut) => ut.team_id) : []),
     [session, data.userTeams]
   )
-  const canEditContainer = (c) => !!session && (isAdmin || (c && myTeamIds.includes(c.team_id)))
+  // "View as" preview (admins only) swaps in a member's or the public's permissions.
+  // UI only: the database still treats you as an admin.
+  const previewing = realIsAdmin && viewAs !== 'self'
+  const viewSession = previewing && viewAs === 'public' ? null : session
+  const isAdmin = realIsAdmin && !previewing
+  const myTeamIds = !previewing ? realTeamIds : viewAs.startsWith('team:') ? [viewAs.slice(5)] : []
+  const userId = viewSession?.user?.id || null
+  const canEditContainer = (c) => !!viewSession && (isAdmin || (c && myTeamIds.includes(c.team_id)))
   const teamName = (id) => data.teams.find((t) => t.id === id)?.name || null
   const fullName = (p) => p ? [p.first_name, p.last_name].filter(Boolean).join(' ').trim() : ''
   const profileName = (id) => { const p = data.profiles.find((x) => x.id === id); return (p && fullName(p)) || 'a member' }
@@ -96,7 +104,7 @@ export default function App() {
   // Pick a compartment on the vehicle diagram (null = show the whole unit).
   const selectCompartment = (compartmentId) => setDrawer((d) => ({ ...d, mode: 'container', itemId: null, compartmentId }))
 
-  const ctx = { data, session, userId, isAdmin, myTeamIds, canEditContainer, teamName, profileName, refresh, openRoom, openContainer, openItem, openInventory, closeDrawer, selectCompartment }
+  const ctx = { data, session: viewSession, userId, isAdmin, myTeamIds, canEditContainer, teamName, profileName, refresh, openRoom, openContainer, openItem, openInventory, closeDrawer, selectCompartment }
 
   // ---- search ----
   const q = query.trim().toLowerCase()
@@ -125,6 +133,14 @@ export default function App() {
       return ['Base', room?.name, c?.name, comp?.name, it?.name].filter(Boolean).join('  ›  ')
     }
     return { dashboard: 'Base Dashboard', floorplan: 'Base Overview', callout: 'Callout', org: 'Org Chart', units: 'Org Chart', admin: 'Admin' }[view]
+  }
+
+  const viewAsLabel = viewAs === 'public' ? 'the public (not signed in)'
+    : viewAs === 'member' ? 'a member with no team'
+    : viewAs.startsWith('team:') ? `someone on the ${teamName(viewAs.slice(5)) || ''} team` : ''
+  function changeViewAs(v) {
+    setViewAs(v)
+    if (v !== 'self' && view === 'admin') setView('dashboard')
   }
 
   const NavItem = ({ id, icon: Icon, label }) => (
@@ -180,7 +196,18 @@ export default function App() {
             <>
               <div className="who">{fullName(profile) || session.user.email}</div>
               <div className="role">{isAdmin ? 'Admin' : (isApproved ? (myTeamIds.length ? myTeamIds.map(teamName).filter(Boolean).join(', ') : 'Member — no team yet') : 'Pending approval')}</div>
-              <button className="btn sm block" style={{ marginTop: 10 }} onClick={async () => { await supabase.auth.signOut() }}><LogOut size={13} /> Sign out</button>
+              {realIsAdmin && (
+                <div className="field" style={{ margin: '10px 0 0' }}>
+                  <label htmlFor="viewAs">View as</label>
+                  <select id="viewAs" value={viewAs} onChange={(e) => changeViewAs(e.target.value)}>
+                    <option value="self">Admin (you)</option>
+                    <option value="member">Member — no team</option>
+                    {data.teams.map((t) => <option key={t.id} value={'team:' + t.id}>Member — {t.name}</option>)}
+                    <option value="public">Public — not signed in</option>
+                  </select>
+                </div>
+              )}
+              <button className="btn sm block" style={{ marginTop: 10 }} onClick={async () => { setViewAs('self'); await supabase.auth.signOut() }}><LogOut size={13} /> Sign out</button>
             </>
           ) : (
             <>
@@ -193,6 +220,12 @@ export default function App() {
 
       {/* main */}
       <div id="main">
+        {previewing && (
+          <div className="previewBar">
+            Previewing the app as {viewAsLabel}. Anything you change still saves with your admin rights.
+            <button className="btn sm" onClick={() => changeViewAs('self')}>Back to admin view</button>
+          </div>
+        )}
         {offline && <div className="offlineBar">Offline — showing last-known data from this device. Changes can’t be saved until you reconnect.</div>}
         <div id="topbar">
           <h2>{crumb()}</h2>

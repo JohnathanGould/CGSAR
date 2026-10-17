@@ -47,6 +47,7 @@ a{color:inherit;text-decoration:none;}
 #authbox .who{color:var(--text);font-weight:700;font-size:13px;}
 #authbox .role{color:var(--accent);font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;}
 
+.previewBar{display:flex;align-items:center;justify-content:center;gap:12px;flex-wrap:wrap;background:#16283a;color:#cfe6ff;font-size:12.5px;padding:6px 12px;text-align:center;border-bottom:1px solid #24476b;}
 .offlineBar{background:var(--accent-dim);color:#ffd8bf;font-size:12px;padding:6px 12px;text-align:center;}
 
 /* ---------- main ---------- */
