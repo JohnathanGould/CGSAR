@@ -29,6 +29,7 @@ export default function App() {
   const [query, setQuery] = useState('')
   const [authOpen, setAuthOpen] = useState(false)
   const [helpOpen, setHelpOpen] = useState(false)
+  const [recoveryOpen, setRecoveryOpen] = useState(false)
   const deepLinkDone = React.useRef(false)
 
   async function refresh() {
@@ -49,7 +50,11 @@ export default function App() {
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => setSession(data.session))
-    const { data: sub } = supabase.auth.onAuthStateChange((_e, s) => { setSession(s); refresh() })
+    const { data: sub } = supabase.auth.onAuthStateChange((e, s) => {
+      setSession(s)
+      if (e === 'PASSWORD_RECOVERY') setRecoveryOpen(true)
+      refresh()
+    })
     refresh()
     return () => sub.subscription.unsubscribe()
   }, [])
@@ -223,7 +228,36 @@ export default function App() {
 
       {authOpen && <AuthModal onClose={() => setAuthOpen(false)} />}
       {helpOpen && <HelpModal isAdmin={isAdmin} onClose={() => setHelpOpen(false)} />}
+      {recoveryOpen && <NewPasswordModal onClose={() => setRecoveryOpen(false)} />}
     </div>
+  )
+}
+
+// Shown after following a password-reset email link (Supabase PASSWORD_RECOVERY event).
+function NewPasswordModal({ onClose }) {
+  const [password, setPassword] = useState('')
+  const [confirm, setConfirm] = useState('')
+  const [msg, setMsg] = useState('')
+  const [busy, setBusy] = useState(false)
+
+  async function submit() {
+    if (password.length < 6) { setMsg('Use at least 6 characters.'); return }
+    if (password !== confirm) { setMsg('Passwords don’t match.'); return }
+    setBusy(true)
+    const { error } = await supabase.auth.updateUser({ password })
+    setBusy(false)
+    if (error) setMsg(error.message); else onClose()
+  }
+
+  return (
+    <Modal title="Set a new password" sub="You followed a reset link. Choose a new password for your account." onClose={onClose}>
+      <div className="field"><label>New password</label><input type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoFocus /></div>
+      <div className="field"><label>Confirm password</label><input type="password" value={confirm} onChange={(e) => setConfirm(e.target.value)} /></div>
+      {msg && <div className="hint">{msg}</div>}
+      <div className="formActions">
+        <button className="btn accent" onClick={submit} disabled={busy}>{busy ? '…' : 'Save password'}</button>
+      </div>
+    </Modal>
   )
 }
 
@@ -238,7 +272,15 @@ function AuthModal({ onClose }) {
 
   async function submit() {
     setMsg('')
-    if (mode === 'signin') {
+    if (mode === 'forgot') {
+      if (!email.trim()) { setMsg('Enter your email first.'); return }
+      setBusy(true)
+      const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+        redirectTo: window.location.origin + window.location.pathname,
+      })
+      setBusy(false)
+      setMsg(error ? error.message : 'If that email has an account, a reset link is on its way. Open it on this device to set a new password.')
+    } else if (mode === 'signin') {
       setBusy(true)
       const { error } = await supabase.auth.signInWithPassword({ email, password })
       setBusy(false)
@@ -258,7 +300,7 @@ function AuthModal({ onClose }) {
   }
 
   return (
-    <Modal title={mode === 'signin' ? 'Sign in' : 'Create account'} sub="Members log in to edit their team’s shelves." onClose={onClose}>
+    <Modal title={{ signin: 'Sign in', signup: 'Create account', forgot: 'Reset password' }[mode]} sub={mode === 'forgot' ? 'We’ll email you a link to set a new password.' : 'Members log in to edit their team’s shelves.'} onClose={onClose}>
       {mode === 'signup' && (
         <div className="formRow">
           <div className="field"><label>First name</label><input value={firstName} onChange={(e) => setFirstName(e.target.value)} autoFocus /></div>
@@ -266,12 +308,13 @@ function AuthModal({ onClose }) {
         </div>
       )}
       <div className="field"><label>Email</label><input value={email} onChange={(e) => setEmail(e.target.value)} /></div>
-      <div className="field"><label>Password</label><input type="password" value={password} onChange={(e) => setPassword(e.target.value)} /></div>
+      {mode !== 'forgot' && <div className="field"><label>Password</label><input type="password" value={password} onChange={(e) => setPassword(e.target.value)} /></div>}
+      {mode === 'signin' && <button className="linkBtn" onClick={() => { setMode('forgot'); setMsg('') }}>Forgot password?</button>}
       {mode === 'signup' && <div className="hint">New accounts need admin approval before access is granted.</div>}
       {msg && <div className="hint">{msg}</div>}
       <div className="formActions">
         <button className="btn ghost" onClick={() => { setMode(mode === 'signin' ? 'signup' : 'signin'); setMsg('') }}>{mode === 'signin' ? 'Create account' : 'Have an account? Sign in'}</button>
-        <button className="btn accent" onClick={submit} disabled={busy}>{busy ? '…' : (mode === 'signin' ? 'Sign in' : 'Create account')}</button>
+        <button className="btn accent" onClick={submit} disabled={busy}>{busy ? '…' : { signin: 'Sign in', signup: 'Create account', forgot: 'Send reset link' }[mode]}</button>
       </div>
     </Modal>
   )
