@@ -21,6 +21,8 @@ straight to its location.
    those units to match the sheet.
    Run [`supabase_004_unit_documents.sql`](./supabase_004_unit_documents.sql) to enable SOP PDF
    documents on vehicle/trailer units (creates the `unit-docs` storage bucket and its permissions).
+   Run [`supabase_005_reminders.sql`](./supabase_005_reminders.sql) to enable service dates (MVI,
+   registration, renewals) on units and general reminders on the Dashboard.
 2. **Authentication → Providers → Email:** enable Email. For a quick internal tool you can turn
    *Confirm email* OFF so new logins work immediately.
 3. **Authentication → URL Configuration:** set Site URL + a redirect of your GitHub Pages URL, e.g.

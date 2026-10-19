@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import {
-  Search, LayoutDashboard, Map, Users, Shield, LogIn, LogOut, HelpCircle, UserCircle,
+  Search, LayoutDashboard, Boxes, Users, Shield, LogIn, LogOut, HelpCircle, UserCircle,
 } from 'lucide-react'
 import { supabase } from './lib/supabase'
 import logo from './assets/logo.png'
@@ -8,7 +8,8 @@ import { loadAll } from './lib/data'
 import { saveCache, loadCache } from './lib/cache'
 import { newerBundle, reloadToNewVersion } from './lib/updateCheck'
 import { replacementBadge } from './lib/helpers'
-import Floorplan, { topoPaths } from './components/Floorplan'
+import { topoPaths } from './components/Floorplan'
+import Inventory from './components/Inventory'
 import VehicleDiagram from './components/VehicleDiagram'
 import { compartmentsOf } from './lib/compartments'
 import Dashboard from './components/Dashboard'
@@ -18,7 +19,7 @@ import OrgChart from './components/OrgChart'
 import Admin from './components/Admin'
 import Modal from './components/Modal'
 
-const EMPTY = { teams: [], rooms: [], containers: [], items: [], orgPositions: [], orgMembers: [], checkouts: [], userTeams: [], profiles: [], compartments: [], unitDocs: [] }
+const EMPTY = { teams: [], rooms: [], containers: [], items: [], orgPositions: [], orgMembers: [], checkouts: [], userTeams: [], profiles: [], compartments: [], unitDocs: [], reminders: [] }
 
 export default function App() {
   const [session, setSession] = useState(null)
@@ -119,7 +120,8 @@ export default function App() {
 
   // ---- navigation ----
   const openRoom = (roomId) => { setView('floorplan'); setDrawer({ open: true, mode: 'room', roomId, containerId: null, itemId: null, compartmentId: null }) }
-  const openContainer = (roomId, containerId, compartmentId = null) => { setView('floorplan'); setDrawer({ open: true, mode: 'container', roomId, containerId, itemId: null, compartmentId }) }
+  // tab: which vehicle tab to open on ('items' | 'sop' | 'service'); defaults to Gear.
+  const openContainer = (roomId, containerId, compartmentId = null, tab = null) => { setView('floorplan'); setDrawer({ open: true, mode: 'container', roomId, containerId, itemId: null, compartmentId, tab }) }
   const openItem = (roomId, containerId, itemId) => { setView('floorplan'); setDrawer({ open: true, mode: 'item', roomId, containerId, itemId, compartmentId: null }) }
   const openInventory = (roomId, containerId) => { setView('floorplan'); setDrawer({ open: true, mode: 'inventory', roomId, containerId, itemId: null, compartmentId: null }) }
   const closeDrawer = () => setDrawer({ open: false, mode: 'room', roomId: null, containerId: null, itemId: null, compartmentId: null })
@@ -152,9 +154,9 @@ export default function App() {
       const c = data.containers.find((x) => x.id === drawer.containerId)
       const it = data.items.find((x) => x.id === drawer.itemId)
       const comp = data.compartments.find((x) => x.id === (it ? it.compartment_id : drawer.compartmentId))
-      return ['Base', room?.name, c?.name, comp?.name, it?.name].filter(Boolean).join('  ›  ')
+      return ['Inventory', room?.name, c?.name, comp?.name, it?.name].filter(Boolean).join('  ›  ')
     }
-    return { dashboard: 'Base Dashboard', floorplan: 'Base Overview', org: 'Org Chart', units: 'Org Chart', admin: 'Admin' }[view]
+    return { dashboard: 'Dashboard', floorplan: 'Inventory', org: 'Org Chart', units: 'Org Chart', admin: 'Admin' }[view]
   }
 
   const viewAsLabel = viewAs === 'public' ? 'the public (not signed in)'
@@ -208,7 +210,7 @@ export default function App() {
 
         <div id="nav">
           <NavItem id="dashboard" icon={LayoutDashboard} label="Dashboard" />
-          <NavItem id="floorplan" icon={Map} label="Floorplan" />
+          <NavItem id="floorplan" icon={Boxes} label="Inventory" />
           <NavItem id="org" icon={Users} label="Org Chart" />
           {isAdmin && <NavItem id="admin" icon={Shield} label="Admin" />}
         </div>
@@ -289,7 +291,7 @@ export default function App() {
               onSelect={selectCompartment}
             />
           ) : view === 'floorplan' ? (
-            <Floorplan rooms={data.rooms} activeRoomId={drawer.roomId} hitRoomIds={hitRoomIds} onRoomClick={(r) => openRoom(r.id)} />
+            <Inventory ctx={ctx} activeRoomId={drawer.roomId} hitRoomIds={hitRoomIds} />
           ) : view === 'units' ? (
             <OrgChart ctx={ctx} />
           ) : view === 'org' ? (

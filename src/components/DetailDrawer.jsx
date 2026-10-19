@@ -1,22 +1,28 @@
 import React, { useEffect, useState } from 'react'
 import {
   X, ChevronRight, Plus, Pencil, Trash2, ClipboardCheck, PackageOpen,
-  LogOut, LogIn, Save, QrCode, Camera, History, Truck, AlertTriangle, PackageX, FileText, Upload,
+  LogOut, LogIn, Save, QrCode, Camera, History, Truck, AlertTriangle, PackageX, FileText, Upload, Clock, CalendarCheck,
 } from 'lucide-react'
 import { replacementBadge, fmtDate, fmtDateTime, lowStock } from '../lib/helpers'
 import * as api from '../lib/data'
 import { SIDES, compartmentsOf, compartmentLabel } from '../lib/compartments'
 import QRModal from './QRModal'
 import VehicleDiagram from './VehicleDiagram'
+import ReminderForm from './ReminderForm'
 
-// Red/amber flags for gear needing attention before a unit rolls.
-function UnitFlags({ items, style }) {
-  const repl = items.filter((i) => replacementBadge(i.needs_replacement_by)).length
+// Red/amber flags for anything needing attention before a unit rolls: gear
+// that has expired or is due for service, unit due dates (MVI etc.), low stock.
+function UnitFlags({ items, reminders = [], style }) {
+  const dates = [...items.map((i) => i.needs_replacement_by), ...reminders.map((r) => r.due_date)]
+  const kinds = dates.map((d) => replacementBadge(d)?.kind)
+  const overdue = kinds.filter((k) => k === 'overdue').length
+  const soon = kinds.filter((k) => k === 'soon').length
   const low = items.filter(lowStock).length
-  if (!repl && !low) return null
+  if (!overdue && !soon && !low) return null
   return (
     <div className="rowActions" style={{ margin: 0, ...style }}>
-      {repl > 0 && <span className="badge overdue"><AlertTriangle size={11} /> {repl} to replace</span>}
+      {overdue > 0 && <span className="badge overdue"><AlertTriangle size={11} /> {overdue} overdue</span>}
+      {soon > 0 && <span className="badge soon"><Clock size={11} /> {soon} due soon</span>}
       {low > 0 && <span className="badge low"><PackageX size={11} /> {low} low stock</span>}
     </div>
   )
@@ -69,8 +75,8 @@ function ItemForm({ initial, compartments = [], defaultCompartmentId, onCancel, 
       )}
       <div className="field"><label>Location detail</label><input value={f.loc_detail} onChange={up('loc_detail')} placeholder={compartments.length ? 'e.g. Top shelf, black Pelican case' : 'e.g. Bin 3, upper shelf'} /></div>
       <div className="formRow">
-        <div className="field"><label>Needs replacement by</label><input type="date" value={f.needs_replacement_by || ''} onChange={up('needs_replacement_by')} /></div>
-        <div className="field"><label>Replacement note</label><input value={f.needs_replacement_note} onChange={up('needs_replacement_note')} placeholder="e.g. chain worn" /></div>
+        <div className="field"><label>Expires / service due</label><input type="date" value={f.needs_replacement_by || ''} onChange={up('needs_replacement_by')} /></div>
+        <div className="field"><label>Note</label><input value={f.needs_replacement_note} onChange={up('needs_replacement_note')} placeholder="e.g. lot 42B, annual service" /></div>
       </div>
       {err && <div className="errText">{err}</div>}
       <div className="formActions">
@@ -247,9 +253,11 @@ export default function DetailDrawer({ ctx, drawer, hitCompartmentIds }) {
     .sort((a, b) => (compRank[a.compartment_id] ?? 1e9) - (compRank[b.compartment_id] ?? 1e9))
   const selectedComp = compById[drawer.compartmentId] || null
   const unitDocs = (data.unitDocs || []).filter((d) => d.container_id === drawer.containerId)
+  const remindersOf = (cid) => (data.reminders || []).filter((r) => r.container_id === cid)
+  const unitReminders = remindersOf(drawer.containerId)
   const canEdit = canEditContainer(container)
 
-  useEffect(() => { setTab('items') }, [drawer.containerId])
+  useEffect(() => { setTab(drawer.tab || 'items') }, [drawer.containerId, drawer.tab])
   useEffect(() => {
     if (drawer.mode === 'inventory') {
       const d = {}
@@ -326,7 +334,7 @@ export default function DetailDrawer({ ctx, drawer, hitCompartmentIds }) {
                     <div>
                       <div className="crName">{c.name} {tn && <span className="teamBadge">{tn}</span>}</div>
                       <div className="crCount">{n === 1 ? '1 item' : n + ' items'} · {c.last_checked_at ? 'checked ' + fmtDate(c.last_checked_at) : 'never checked'}</div>
-                      <UnitFlags items={its} style={{ marginTop: 6 }} />
+                      <UnitFlags items={its} reminders={remindersOf(c.id)} style={{ marginTop: 6 }} />
                     </div>
                     <ChevronRight className="crArrow" size={18} />
                   </div>
@@ -356,7 +364,7 @@ export default function DetailDrawer({ ctx, drawer, hitCompartmentIds }) {
               ? `Last checked ${fmtDate(container.last_checked_at)}${container.last_checked_by ? ' by ' + profileName(container.last_checked_by) : ''}`
               : 'Never checked'}
           </div>
-          <UnitFlags items={itemsOfContainer} style={{ marginBottom: 12 }} />
+          <UnitFlags items={itemsOfContainer} reminders={unitReminders} style={{ marginBottom: 12 }} />
 
           <button className="btn sm" style={{ marginBottom: 14 }} onClick={() => setModal({ type: 'qr' })}><QrCode size={13} /> QR tag</button>
 
@@ -388,10 +396,11 @@ export default function DetailDrawer({ ctx, drawer, hitCompartmentIds }) {
             <div className="tabs">
               <button className={'tab' + (tab === 'items' ? ' active' : '')} onClick={() => setTab('items')}>Gear</button>
               <button className={'tab' + (tab === 'sop' ? ' active' : '')} onClick={() => setTab('sop')}>SOPs{unitDocs.length ? ` (${unitDocs.length})` : ''}</button>
+              <button className={'tab' + (tab === 'service' ? ' active' : '')} onClick={() => setTab('service')}>Service{unitReminders.length ? ` (${unitReminders.length})` : ''}</button>
             </div>
           )}
 
-          {tab === 'sop' && container?.is_vehicle_unit ? renderSOP() : renderItemsList()}
+          {container?.is_vehicle_unit && tab === 'sop' ? renderSOP() : container?.is_vehicle_unit && tab === 'service' ? renderService() : renderItemsList()}
         </div>
       </>
     )
@@ -519,6 +528,37 @@ export default function DetailDrawer({ ctx, drawer, hitCompartmentIds }) {
     )
   }
 
+  function renderService() {
+    const list = [...unitReminders].sort((a, b) => a.due_date.localeCompare(b.due_date))
+    return (
+      <>
+        <p className="hint" style={{ marginTop: 0 }}>Inspections and renewals for this unit (MVI, registration, insurance…). Anything overdue or due within 30 days shows on the Dashboard.</p>
+        {list.length === 0 ? <div className="hint" style={{ marginBottom: 10 }}>No service dates yet.</div> : list.map((r) => {
+          const badge = replacementBadge(r.due_date)
+          return (
+            <div key={r.id} className="listRow" style={{ cursor: 'default' }}>
+              <div className="lr-main">
+                <div className="lr-title">{r.title}{badge && <span className={'badge ' + badge.kind}>{badge.label}</span>}</div>
+                <div className="lr-sub">
+                  due {fmtDate(r.due_date)}{r.repeat_months ? ` · every ${r.repeat_months === 12 ? 'year' : r.repeat_months + ' months'}` : ''}
+                  {r.last_done_at ? ` · last done ${fmtDate(r.last_done_at)}` : ''}{r.note ? ` · ${r.note}` : ''}
+                </div>
+              </div>
+              {canEdit && (
+                <div className="rowActions" style={{ margin: 0 }}>
+                  {r.repeat_months && <button className="btn sm" title="Mark done and roll to the next due date" onClick={async () => done(await api.markReminderDone(r, userId))}><CalendarCheck size={13} /> Done</button>}
+                  <button className="btn sm ghost" title="Edit" onClick={() => setModal({ type: 'reminder', reminder: r })}><Pencil size={13} /></button>
+                  <button className="btn sm danger" title="Delete" onClick={async () => { if (confirm(`Delete “${r.title}”?`)) done(await api.deleteReminder(r.id)) }}><Trash2 size={13} /></button>
+                </div>
+              )}
+            </div>
+          )
+        })}
+        {canEdit && <button className="btn dashed block" style={{ marginTop: 6 }} onClick={() => setModal({ type: 'reminder' })}><Plus size={14} /> Add service date</button>}
+      </>
+    )
+  }
+
   /* ---- ITEM MODE ---- */
   function renderItem() {
     if (!item) return null
@@ -546,10 +586,10 @@ export default function DetailDrawer({ ctx, drawer, hitCompartmentIds }) {
           <div className="kv"><span className="k">Location</span><span className="v">{item.loc_detail || '—'}</span></div>
           <div className="kv"><span className="k">Status</span><span className="v">{item.status || '—'}</span></div>
 
-          <p className="sectionLabel" style={{ marginTop: 20 }}>Replacement</p>
+          <p className="sectionLabel" style={{ marginTop: 20 }}>Expiry / service</p>
           {item.needs_replacement_by ? (
-            <div className="kv"><span className="k">Replace by</span><span className="v">{fmtDate(item.needs_replacement_by)} {badge && <span className={'badge ' + badge.kind}>{badge.label}</span>}</span></div>
-          ) : <div className="hint">No replacement date set.</div>}
+            <div className="kv"><span className="k">Expires / due</span><span className="v">{fmtDate(item.needs_replacement_by)} {badge && <span className={'badge ' + badge.kind}>{badge.label}</span>}</span></div>
+          ) : <div className="hint">No expiry or service date set.</div>}
           {item.needs_replacement_note && <div className="kv"><span className="k">Note</span><span className="v">{item.needs_replacement_note}</span></div>}
 
           <p className="sectionLabel" style={{ marginTop: 20 }}>Sign-out</p>
@@ -685,6 +725,15 @@ export default function DetailDrawer({ ctx, drawer, hitCompartmentIds }) {
             const sort = (containersOfRoom.reduce((m, c) => Math.max(m, c.sort_order || 0), 0) || 0) + 1
             const r = await api.addContainer({ ...p, room_id: drawer.roomId, sort_order: sort })
             if (!r.error) { setModal(null); await refresh() } return r
+          }} />
+        </ModalWrap>
+      )}
+      {modal?.type === 'reminder' && container && (
+        <ModalWrap title={modal.reminder ? 'Edit service date' : 'Add service date — ' + container.name} onClose={() => setModal(null)}>
+          <ReminderForm initial={modal.reminder} onCancel={() => setModal(null)} onSave={async (p) => {
+            const r = await api.saveReminder(modal.reminder ? { ...p, id: modal.reminder.id } : { ...p, container_id: container.id }, userId)
+            if (!r.error) { setModal(null); await refresh() }
+            return r
           }} />
         </ModalWrap>
       )}

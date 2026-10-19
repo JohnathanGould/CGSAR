@@ -2,7 +2,7 @@ import { supabase } from './supabase'
 
 // ---- Load everything the SPA needs in one round-trip ----
 export async function loadAll() {
-  const [teams, rooms, containers, items, orgPositions, orgMembers, checkouts, userTeams, profiles, compartments, unitDocs] =
+  const [teams, rooms, containers, items, orgPositions, orgMembers, checkouts, userTeams, profiles, compartments, unitDocs, reminders] =
     await Promise.all([
       supabase.from('teams').select('*').order('name'),
       supabase.from('rooms').select('*').order('sort_order'),
@@ -17,6 +17,8 @@ export async function loadAll() {
       supabase.from('compartments').select('*').order('sort_order'),
       // Missing until supabase_004_unit_documents.sql is run; treated as empty.
       supabase.from('unit_documents').select('*').order('sort_order').order('uploaded_at'),
+      // Missing until supabase_005_reminders.sql is run; treated as empty.
+      supabase.from('reminders').select('*').order('due_date'),
     ])
 
   const firstErr = [teams, rooms, containers, items].find((r) => r.error)
@@ -34,6 +36,7 @@ export async function loadAll() {
     profiles: profiles.data || [],
     compartments: compartments.data || [],
     unitDocs: unitDocs.data || [],
+    reminders: reminders.data || [],
   }
 }
 
@@ -158,6 +161,29 @@ export async function deleteUnitDoc(doc) {
   const res = await supabase.from('unit_documents').delete().eq('id', doc.id)
   if (!res.error) await supabase.storage.from('unit-docs').remove([doc.file_path])
   return res
+}
+
+// ---- Reminders: unit / general due dates (MVI, registration, renewals) ----
+export async function saveReminder(payload, userId) {
+  const row = { ...payload, updated_by: userId || null }
+  if (row.id) {
+    const { id, ...rest } = row
+    return supabase.from('reminders').update(rest).eq('id', id)
+  }
+  return supabase.from('reminders').insert(row)
+}
+export async function deleteReminder(id) { return supabase.from('reminders').delete().eq('id', id) }
+
+// Rolls a repeating reminder forward: next due is N months after the later of
+// its current due date and today (so doing it early keeps the schedule, doing
+// it late restarts the cycle from today).
+export async function markReminderDone(r, userId) {
+  const today = new Date(); today.setHours(0, 0, 0, 0)
+  const due = new Date(r.due_date + 'T00:00:00')
+  const base = due > today ? due : today
+  const next = new Date(base); next.setMonth(next.getMonth() + r.repeat_months)
+  const iso = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+  return supabase.from('reminders').update({ due_date: iso(next), last_done_at: iso(today), updated_by: userId || null }).eq('id', r.id)
 }
 
 // ---- Rooms (admin) ----
