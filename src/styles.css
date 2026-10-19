@@ -90,9 +90,8 @@ svg.vehicle{width:100%;max-width:1100px;height:auto;}
 .vehicleFoot b{color:var(--text);}
 .compHead{display:flex;justify-content:space-between;align-items:baseline;margin:16px 0 8px;font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);font-weight:700;}
 .compHead.hit{color:var(--accent);}
-.chipRow{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px;}
-.chip{padding:4px 10px;border-radius:999px;border:1px solid var(--line);background:var(--panel-2);color:var(--muted);font-size:12px;font-weight:600;cursor:pointer;}
-.chip.active{border-color:var(--accent);color:var(--text);background:var(--room-active);}
+.compFilter{display:flex;align-items:center;justify-content:space-between;gap:10px;background:var(--room-active);border:1px solid var(--accent);border-radius:8px;padding:6px 6px 6px 12px;margin-bottom:10px;font-size:13px;}
+.compFilter .btn{white-space:nowrap;flex:none;}
 .compRow{display:flex;gap:6px;align-items:center;margin-bottom:6px;}
 
 .compRow input,.compRow select{flex:1;min-width:0;background:var(--bg);border:1px solid var(--line);color:var(--text);padding:7px 9px;border-radius:6px;font-size:13px;outline:none;font-family:inherit;}

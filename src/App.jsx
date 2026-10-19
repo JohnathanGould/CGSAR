@@ -130,8 +130,10 @@ export default function App() {
   const closeDrawer = () => setDrawer({ open: false, mode: 'room', roomId: null, containerId: null, itemId: null, compartmentId: null })
   // Pick a compartment on the vehicle diagram (null = show the whole unit).
   const selectCompartment = (compartmentId) => setDrawer((d) => ({ ...d, mode: 'container', itemId: null, compartmentId }))
+  // The compartment editor pop-up, opened from the vehicle diagram.
+  const setManageCompartments = (manage) => setDrawer((d) => ({ ...d, manage }))
 
-  const ctx = { data, session: viewSession, userId, isAdmin, myTeamIds, canEditContainer, teamName, profileName, refresh, openRoom, openContainer, openItem, openInventory, closeDrawer, selectCompartment }
+  const ctx = { data, session: viewSession, userId, isAdmin, myTeamIds, canEditContainer, teamName, profileName, refresh, openRoom, openContainer, openItem, openInventory, closeDrawer, selectCompartment, setManageCompartments }
 
   // ---- search (Inventory tab) ----
   const q = query.trim()
@@ -275,6 +277,7 @@ export default function App() {
               selectedId={drawer.mode === 'item' ? data.items.find((i) => i.id === drawer.itemId)?.compartment_id : drawer.compartmentId}
               hitIds={hitCompartmentIds}
               onSelect={selectCompartment}
+              onManage={canEditContainer(drawerContainer) ? () => setManageCompartments(true) : null}
             />
           ) : view === 'inventory' ? (
             <Inventory ctx={ctx} query={query} setQuery={setQuery} results={results} />

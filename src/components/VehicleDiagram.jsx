@@ -1,4 +1,5 @@
 import React from 'react'
+import { Pencil } from 'lucide-react'
 
 // Top-down schematic of a vehicle unit. Each compartment is a clickable slot;
 // slots holding search hits are highlighted. Two layouts:
@@ -86,7 +87,7 @@ function slots(area, n) {
   return out
 }
 
-export default function VehicleDiagram({ unitName, compartments, items, selectedId, hitIds, onSelect, layout = 'wide', className = '' }) {
+export default function VehicleDiagram({ unitName, compartments, items, selectedId, hitIds, onSelect, onManage, layout = 'wide', className = '' }) {
   const L = LAYOUTS[layout]
   const hits = hitIds || new Set()
   const count = (id) => items.filter((i) => i.compartment_id === id).length
@@ -149,6 +150,11 @@ export default function VehicleDiagram({ unitName, compartments, items, selected
         {layout === 'wide' && <><b>{unitName}</b> · </>}tap a compartment to see what’s in it
         {unassigned > 0 && <> · <span style={{ color: 'var(--soon)' }}>{unassigned} item{unassigned === 1 ? '' : 's'} not yet assigned to a compartment</span></>}
       </div>
+      {onManage && (
+        <button className="btn sm ghost" style={{ marginTop: 8 }} onClick={onManage}>
+          <Pencil size={13} /> {compartments.length ? 'Edit compartments' : 'Set up compartments'}
+        </button>
+      )}
     </div>
   )
 }
