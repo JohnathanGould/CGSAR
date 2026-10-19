@@ -1,17 +1,17 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import {
-  Search, LayoutDashboard, Boxes, Users, Shield, LogIn, LogOut, HelpCircle, UserCircle,
+  LayoutDashboard, Boxes, Map, Users, Shield, LogIn, LogOut, HelpCircle, UserCircle,
 } from 'lucide-react'
 import { supabase } from './lib/supabase'
 import logo from './assets/logo.png'
 import { loadAll } from './lib/data'
 import { saveCache, loadCache } from './lib/cache'
 import { newerBundle, reloadToNewVersion } from './lib/updateCheck'
-import { replacementBadge } from './lib/helpers'
-import { topoPaths } from './components/Floorplan'
+import Floorplan, { topoPaths } from './components/Floorplan'
 import Inventory from './components/Inventory'
 import VehicleDiagram from './components/VehicleDiagram'
 import { compartmentsOf } from './lib/compartments'
+import { itemMatches } from './lib/search'
 import Dashboard from './components/Dashboard'
 import DetailDrawer from './components/DetailDrawer'
 import HelpModal from './components/HelpModal'
@@ -119,34 +119,36 @@ export default function App() {
   const profileName = (id) => { const p = data.profiles.find((x) => x.id === id); return (p && fullName(p)) || 'a member' }
 
   // ---- navigation ----
-  const openRoom = (roomId) => { setView('floorplan'); setDrawer({ open: true, mode: 'room', roomId, containerId: null, itemId: null, compartmentId: null }) }
+  // Opening a room / unit / item keeps you on the Inventory tab if that's where
+  // you came from (so search results survive); otherwise shows the floorplan.
+  const browseView = () => setView((v) => (v === 'inventory' ? 'inventory' : 'floorplan'))
+  const openRoom = (roomId) => { browseView(); setDrawer({ open: true, mode: 'room', roomId, containerId: null, itemId: null, compartmentId: null }) }
   // tab: which vehicle tab to open on ('items' | 'sop' | 'service'); defaults to Gear.
-  const openContainer = (roomId, containerId, compartmentId = null, tab = null) => { setView('floorplan'); setDrawer({ open: true, mode: 'container', roomId, containerId, itemId: null, compartmentId, tab }) }
-  const openItem = (roomId, containerId, itemId) => { setView('floorplan'); setDrawer({ open: true, mode: 'item', roomId, containerId, itemId, compartmentId: null }) }
-  const openInventory = (roomId, containerId) => { setView('floorplan'); setDrawer({ open: true, mode: 'inventory', roomId, containerId, itemId: null, compartmentId: null }) }
+  const openContainer = (roomId, containerId, compartmentId = null, tab = null) => { browseView(); setDrawer({ open: true, mode: 'container', roomId, containerId, itemId: null, compartmentId, tab }) }
+  const openItem = (roomId, containerId, itemId) => { browseView(); setDrawer({ open: true, mode: 'item', roomId, containerId, itemId, compartmentId: null }) }
+  const openInventory = (roomId, containerId) => { browseView(); setDrawer({ open: true, mode: 'inventory', roomId, containerId, itemId: null, compartmentId: null }) }
   const closeDrawer = () => setDrawer({ open: false, mode: 'room', roomId: null, containerId: null, itemId: null, compartmentId: null })
   // Pick a compartment on the vehicle diagram (null = show the whole unit).
   const selectCompartment = (compartmentId) => setDrawer((d) => ({ ...d, mode: 'container', itemId: null, compartmentId }))
 
   const ctx = { data, session: viewSession, userId, isAdmin, myTeamIds, canEditContainer, teamName, profileName, refresh, openRoom, openContainer, openItem, openInventory, closeDrawer, selectCompartment }
 
-  // ---- search ----
-  const q = query.trim().toLowerCase()
+  // ---- search (Inventory tab) ----
+  const q = query.trim()
   const results = useMemo(() => {
     if (q.length < 2) return []
     const cById = Object.fromEntries(data.containers.map((c) => [c.id, c]))
     const rById = Object.fromEntries(data.rooms.map((r) => [r.id, r]))
     const compById = Object.fromEntries(data.compartments.map((x) => [x.id, x]))
     return data.items
-      .filter((it) => it.name.toLowerCase().includes(q))
+      .filter((it) => itemMatches(it, q))
       .map((it) => { const c = cById[it.container_id]; const r = c && rById[c.room_id]; return { it, c, r, comp: compById[it.compartment_id] } })
       .filter((x) => x.c && x.r)
-      .slice(0, 40)
   }, [q, data])
   const hitRoomIds = useMemo(() => new Set(results.map((x) => x.r.id)), [results])
   const hitCompartmentIds = useMemo(() => new Set(results.filter((x) => x.comp).map((x) => x.comp.id)), [results])
   const drawerContainer = drawer.open ? data.containers.find((c) => c.id === drawer.containerId) : null
-  const showVehicle = view === 'floorplan' && drawerContainer?.is_vehicle_unit
+  const showVehicle = (view === 'floorplan' || view === 'inventory') && drawerContainer?.is_vehicle_unit
 
   const crumb = () => {
     if (drawer.open) {
@@ -154,9 +156,9 @@ export default function App() {
       const c = data.containers.find((x) => x.id === drawer.containerId)
       const it = data.items.find((x) => x.id === drawer.itemId)
       const comp = data.compartments.find((x) => x.id === (it ? it.compartment_id : drawer.compartmentId))
-      return ['Inventory', room?.name, c?.name, comp?.name, it?.name].filter(Boolean).join('  ›  ')
+      return [view === 'inventory' ? 'Inventory' : 'Base', room?.name, c?.name, comp?.name, it?.name].filter(Boolean).join('  ›  ')
     }
-    return { dashboard: 'Dashboard', floorplan: 'Inventory', org: 'Org Chart', units: 'Org Chart', admin: 'Admin' }[view]
+    return { dashboard: 'Dashboard', inventory: 'Inventory', floorplan: 'Base Floorplan', org: 'Org Chart', units: 'Org Chart', admin: 'Admin' }[view]
   }
 
   const viewAsLabel = viewAs === 'public' ? 'the public (not signed in)'
@@ -191,26 +193,10 @@ export default function App() {
           <div className="sub">73 Ventura Dr, Debert NS</div>
         </div>
 
-        <div id="searchWrap">
-          <label htmlFor="searchBox">Find equipment</label>
-          <input id="searchBox" className="searchBox" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="e.g. splint, radio, gauze…" autoComplete="off" />
-          <div id="searchResults">
-            {q.length >= 2 && results.length === 0 && <div id="noResults">No matches.</div>}
-            {results.map(({ it, c, r, comp }) => {
-              const badge = replacementBadge(it.needs_replacement_by)
-              return (
-                <div key={it.id} className="result" onClick={() => { openContainer(r.id, c.id, comp ? comp.id : null) }}>
-                  <b>{it.name} <span style={{ color: 'var(--muted)', fontWeight: 400 }}>×{it.qty}</span>{badge && <span className={'badge ' + badge.kind}>{badge.label}</span>}</b>
-                  <span>{c.is_vehicle_unit ? c.name : r.name + ' → ' + c.name}{comp ? ' → ' + comp.name : ''}{it.loc_detail ? ' → ' + it.loc_detail : ''}</span>
-                </div>
-              )
-            })}
-          </div>
-        </div>
-
         <div id="nav">
           <NavItem id="dashboard" icon={LayoutDashboard} label="Dashboard" />
-          <NavItem id="floorplan" icon={Boxes} label="Inventory" />
+          <NavItem id="inventory" icon={Boxes} label="Inventory" />
+          <NavItem id="floorplan" icon={Map} label="Base Floorplan" />
           <NavItem id="org" icon={Users} label="Org Chart" />
           {isAdmin && <NavItem id="admin" icon={Shield} label="Admin" />}
         </div>
@@ -290,8 +276,13 @@ export default function App() {
               hitIds={hitCompartmentIds}
               onSelect={selectCompartment}
             />
+          ) : view === 'inventory' ? (
+            <Inventory ctx={ctx} query={query} setQuery={setQuery} results={results} />
           ) : view === 'floorplan' ? (
-            <Inventory ctx={ctx} activeRoomId={drawer.roomId} hitRoomIds={hitRoomIds} />
+            <div>
+              <div className="pageHead"><h2>Base Floorplan</h2><p>Ground floor · 73 Ventura Dr, Debert NS. Tap a room to see its shelves and units.</p></div>
+              <Floorplan rooms={data.rooms} activeRoomId={drawer.roomId} hitRoomIds={hitRoomIds} onRoomClick={(r) => openRoom(r.id)} />
+            </div>
           ) : view === 'units' ? (
             <OrgChart ctx={ctx} />
           ) : view === 'org' ? (

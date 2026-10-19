@@ -1,12 +1,49 @@
 import React from 'react'
-import { ClipboardList, ChevronRight, PackageX } from 'lucide-react'
-import { isStale, lowStock, fmtDate } from '../lib/helpers'
-import Floorplan from './Floorplan'
+import { ClipboardList, ChevronRight, PackageX, Search, X } from 'lucide-react'
+import { isStale, lowStock, fmtDate, dueBadge } from '../lib/helpers'
 
-// Inventory tab: the base floorplan plus what needs restocking or re-checking.
-// (Expiry / service dates live on the Dashboard.)
-export default function Inventory({ ctx, activeRoomId, hitRoomIds }) {
-  const { data, openRoom, openItem, openInventory, profileName } = ctx
+// "RPAS Unit › Cab · top shelf" / "Medical Room › Shelf B · Bin 3"
+function locationOf({ it, c, r, comp }) {
+  const path = [c.is_vehicle_unit ? null : r.name, c.name, comp?.name].filter(Boolean).join(' › ')
+  return it.loc_detail ? `${path} · ${it.loc_detail}` : path
+}
+
+function SearchResults({ results, query, openItem }) {
+  if (query.trim().length < 2) return null
+  if (!results.length) return <div className="card" style={{ marginBottom: 18 }}><div className="hint" style={{ margin: 0 }}>No items match “{query.trim()}”.</div></div>
+  // Soonest next-service first; items without a date after, by name.
+  const rows = [...results].sort((a, b) =>
+    (a.it.needs_replacement_by || '9999').localeCompare(b.it.needs_replacement_by || '9999') || a.it.name.localeCompare(b.it.name))
+  const total = rows.reduce((n, x) => n + (x.it.qty || 0), 0)
+  const due = rows.filter((x) => dueBadge(x.it.needs_replacement_by)).length
+  return (
+    <div className="card" style={{ marginBottom: 18 }}>
+      <h3>{rows.length} {rows.length === 1 ? 'match' : 'matches'} <span className="count">{total} in total{due ? ` · ${due} overdue or due soon` : ''}</span></h3>
+      <div className="resultTable">
+        <div className="rtHead"><span>Item</span><span>Type</span><span>Qty</span><span>Location</span><span>Last service</span><span>Next service / expiry</span></div>
+        {rows.map((x) => {
+          const badge = dueBadge(x.it.needs_replacement_by)
+          return (
+            <div key={x.it.id} className={'rtRow' + (badge ? ' ' + badge.kind : '')} onClick={() => openItem(x.r.id, x.c.id, x.it.id)}>
+              <span className="rtName">{x.it.name}</span>
+              <span data-label="Type">{x.it.item_type || '—'}</span>
+              <span data-label="Qty">×{x.it.qty}</span>
+              <span data-label="Location">{locationOf(x)}</span>
+              <span data-label="Last service">{x.it.last_serviced_at ? fmtDate(x.it.last_serviced_at) : '—'}</span>
+              <span data-label="Next service">{x.it.needs_replacement_by ? fmtDate(x.it.needs_replacement_by) : '—'}{badge && <span className={'badge ' + badge.kind} style={{ marginLeft: 6 }}>{badge.label}</span>}</span>
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+// Inventory tab: search across every room, shelf and vehicle, and what needs
+// restocking or re-checking. (The building map is the Base Floorplan tab;
+// expiry / service alerts live on the Dashboard.)
+export default function Inventory({ ctx, query, setQuery, results }) {
+  const { data, openItem, openInventory, profileName } = ctx
   const roomById = Object.fromEntries(data.rooms.map((r) => [r.id, r]))
   const containerById = Object.fromEntries(data.containers.map((c) => [c.id, c]))
   const low = data.items.filter(lowStock)
@@ -16,12 +53,17 @@ export default function Inventory({ ctx, activeRoomId, hitRoomIds }) {
     <div>
       <div className="pageHead">
         <h2>Inventory</h2>
-        <p>Tap a room to see its shelves and units, or search for an item in the sidebar.</p>
+        <p>Search every room, shelf and vehicle.</p>
       </div>
 
-      <Floorplan rooms={data.rooms} activeRoomId={activeRoomId} hitRoomIds={hitRoomIds} onRoomClick={(r) => openRoom(r.id)} />
+      <div className="invSearch">
+        <Search size={18} />
+        <input className="searchBox" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search inventory — e.g. fire extinguisher, splint, radio" autoComplete="off" />
+        {query && <button className="invClear" aria-label="Clear search" onClick={() => setQuery('')}><X size={16} /></button>}
+      </div>
+      <SearchResults results={results} query={query} openItem={openItem} />
 
-      <div className="grid2" style={{ marginTop: 18 }}>
+      <div className="grid2">
         <div className="card">
           <h3><PackageX size={16} color="var(--accent)" /> Low stock <span className="count">{low.length}</span></h3>
           {low.length === 0 ? (

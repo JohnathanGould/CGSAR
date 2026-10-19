@@ -23,6 +23,8 @@ straight to its location.
    documents on vehicle/trailer units (creates the `unit-docs` storage bucket and its permissions).
    Run [`supabase_005_reminders.sql`](./supabase_005_reminders.sql) to enable service dates (MVI,
    registration, renewals) on units and general reminders on the Dashboard.
+   Run [`supabase_006_item_service.sql`](./supabase_006_item_service.sql) to add item Type and
+   Last serviced fields (shown in the Inventory search table).
 2. **Authentication → Providers → Email:** enable Email. For a quick internal tool you can turn
    *Confirm email* OFF so new logins work immediately.
 3. **Authentication → URL Configuration:** set Site URL + a redirect of your GitHub Pages URL, e.g.

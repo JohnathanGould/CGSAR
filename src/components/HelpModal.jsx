@@ -3,7 +3,8 @@ import Modal from './Modal'
 
 const SECTIONS = [
   ['Dashboard', 'Shows only what has expired or is coming due in the next 30 days: item expiry / service dates (medications, extinguishers, batteries\u2026) and vehicle service dates like MVI or registration. Tap an entry to jump to it.'],
-  ['Inventory', 'Tap a room on the floorplan, then a shelf or unit to see what\u2019s inside \u2014 or use the search box to jump straight to an item. The Inventory tab also lists low-stock items and anything not checked in 30 days.'],
+  ['Inventory', 'Search at the top of the Inventory tab to list every match across the building and all vehicles \u2014 with its type, location, last service and next service / expiry. Tap a row to open it. The tab also lists low-stock items and anything not checked in 30 days.'],
+  ['Base Floorplan', 'A map of the building. Tap a room to see its shelves and units (Vehicle Bays holds the vehicles and trailers). Rooms holding items that match your Inventory search are outlined.'],
   ['Taking inventory', 'Open a container you have edit access to, use \u201cTake Inventory,\u201d adjust quantities, and save \u2014 this logs who did it and when. You can review past checks under \u201cView check history.\u201d'],
   ['Signing gear out', 'On any item, use \u201cCheck out\u201d to record who has it and when it\u2019s due back; use \u201cCheck in\u201d when it\u2019s returned.'],
   ['Vehicles & trailers', 'Open any unit in Vehicle Bays to see it at a glance: red/amber flags, its gear by compartment, an SOPs tab with its setup/takedown PDFs, and a Service tab for MVI, registration and other dates (repeating dates have a \u201cDone\u201d button that rolls them to the next due date).'],

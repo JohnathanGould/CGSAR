@@ -35,6 +35,7 @@ function ItemForm({ initial, compartments = [], defaultCompartmentId, onCancel, 
     name: initial?.name || '', qty: initial?.qty ?? 1, min_qty: initial?.min_qty ?? 0,
     loc_detail: initial?.loc_detail || '', status: initial?.status || 'Available',
     needs_replacement_by: initial?.needs_replacement_by || '',
+    item_type: initial?.item_type || '', last_serviced_at: initial?.last_serviced_at || '',
     needs_replacement_note: initial?.needs_replacement_note || '',
   })
   const [err, setErr] = useState('')
@@ -49,6 +50,10 @@ function ItemForm({ initial, compartments = [], defaultCompartmentId, onCancel, 
       needs_replacement_by: f.needs_replacement_by || null,
       needs_replacement_note: f.needs_replacement_note.trim() || null,
     }
+    // Only send type / last service once set, so saving still works on a
+    // database that hasn't run supabase_006_item_service.sql yet.
+    if (f.item_type.trim() || initial?.item_type) payload.item_type = f.item_type.trim() || null
+    if (f.last_serviced_at || initial?.last_serviced_at) payload.last_serviced_at = f.last_serviced_at || null
     // Only send compartment_id when the unit has compartments, so saving still
     // works on a database that hasn't run the compartments migration yet.
     if (compartments.length) payload.compartment_id = f.compartment_id || null
@@ -58,7 +63,10 @@ function ItemForm({ initial, compartments = [], defaultCompartmentId, onCancel, 
   }
   return (
     <div>
-      <div className="field"><label>Item name</label><input value={f.name} onChange={up('name')} autoFocus /></div>
+      <div className="formRow">
+        <div className="field" style={{ flex: 2 }}><label>Item name</label><input value={f.name} onChange={up('name')} autoFocus /></div>
+        <div className="field"><label>Type (optional)</label><input value={f.item_type} onChange={up('item_type')} placeholder="e.g. ABC 5 lb" /></div>
+      </div>
       <div className="formRow">
         <div className="field"><label>Quantity</label><input type="number" value={f.qty} onChange={up('qty')} /></div>
         <div className="field"><label>Low-stock min</label><input type="number" value={f.min_qty} onChange={up('min_qty')} /></div>
@@ -75,7 +83,10 @@ function ItemForm({ initial, compartments = [], defaultCompartmentId, onCancel, 
       )}
       <div className="field"><label>Location detail</label><input value={f.loc_detail} onChange={up('loc_detail')} placeholder={compartments.length ? 'e.g. Top shelf, black Pelican case' : 'e.g. Bin 3, upper shelf'} /></div>
       <div className="formRow">
-        <div className="field"><label>Expires / service due</label><input type="date" value={f.needs_replacement_by || ''} onChange={up('needs_replacement_by')} /></div>
+        <div className="field"><label>Last serviced</label><input type="date" value={f.last_serviced_at || ''} onChange={up('last_serviced_at')} /></div>
+        <div className="field"><label>Expires / next service</label><input type="date" value={f.needs_replacement_by || ''} onChange={up('needs_replacement_by')} /></div>
+      </div>
+      <div className="formRow">
         <div className="field"><label>Note</label><input value={f.needs_replacement_note} onChange={up('needs_replacement_note')} placeholder="e.g. lot 42B, annual service" /></div>
       </div>
       {err && <div className="errText">{err}</div>}
@@ -585,11 +596,13 @@ export default function DetailDrawer({ ctx, drawer, hitCompartmentIds }) {
           {compById[item.compartment_id] && <div className="kv"><span className="k">Compartment</span><span className="v">{compartmentLabel(compById[item.compartment_id])}</span></div>}
           <div className="kv"><span className="k">Location</span><span className="v">{item.loc_detail || '—'}</span></div>
           <div className="kv"><span className="k">Status</span><span className="v">{item.status || '—'}</span></div>
+          {item.item_type && <div className="kv"><span className="k">Type</span><span className="v">{item.item_type}</span></div>}
 
           <p className="sectionLabel" style={{ marginTop: 20 }}>Expiry / service</p>
           {item.needs_replacement_by ? (
             <div className="kv"><span className="k">Expires / due</span><span className="v">{fmtDate(item.needs_replacement_by)} {badge && <span className={'badge ' + badge.kind}>{badge.label}</span>}</span></div>
           ) : <div className="hint">No expiry or service date set.</div>}
+          {item.last_serviced_at && <div className="kv"><span className="k">Last serviced</span><span className="v">{fmtDate(item.last_serviced_at)}</span></div>}
           {item.needs_replacement_note && <div className="kv"><span className="k">Note</span><span className="v">{item.needs_replacement_note}</span></div>}
 
           <p className="sectionLabel" style={{ marginTop: 20 }}>Sign-out</p>
