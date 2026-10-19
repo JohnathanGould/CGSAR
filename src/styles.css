@@ -271,6 +271,10 @@ svg.vehicle .zoneLabel{font-size:14px;}
   .formRow{flex-direction:column;gap:0;}
   .field input,.field select,.field textarea,.searchBox,.compRow input,.compRow select{font-size:16px;}
   .listRow{flex-wrap:wrap;}
+  .listRow.dueRow{flex-wrap:nowrap;}
+  .dueRow .lr-main{flex:1;}
+  .dueTile{padding:12px;}
+  .dueTile b{font-size:22px;}
   .listRow .rowActions{flex-wrap:wrap;}
   .pageHead h2{font-size:20px;}
   #floorwrap{flex-direction:column;align-items:stretch;}
@@ -280,3 +284,14 @@ svg.vehicle .zoneLabel{font-size:14px;}
 .docRow{cursor:default;}
 .docLink{flex:1;color:inherit;text-decoration:none;cursor:pointer;}
 .docLink:hover .lr-title{color:var(--accent);}
+
+/* dashboard: due / expired */
+.dueTiles{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:18px;}
+.dueTile{display:flex;align-items:center;gap:10px;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px 16px;color:var(--muted);}
+.dueTile b{font-size:26px;color:var(--text);line-height:1;}
+.dueTile span{font-size:13px;font-weight:600;}
+.dueTile.overdue{border-color:var(--overdue);color:var(--overdue);}
+.dueTile.soon{border-color:var(--soon);color:var(--soon);}
+.dueRow.overdue{border-left:3px solid var(--overdue);}
+.dueRow.soon{border-left:3px solid var(--soon);}
+.allClear{display:flex;align-items:center;gap:10px;font-weight:600;}
