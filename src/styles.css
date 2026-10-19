@@ -277,3 +277,6 @@ svg.vehicle .zoneLabel{font-size:14px;}
   .roomList{display:block;margin-top:14px;}
   .phoneOnly{display:flex;}
 }
+.docRow{cursor:default;}
+.docLink{flex:1;color:inherit;text-decoration:none;cursor:pointer;}
+.docLink:hover .lr-title{color:var(--accent);}

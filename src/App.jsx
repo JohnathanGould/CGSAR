@@ -18,7 +18,7 @@ import OrgChart from './components/OrgChart'
 import Admin from './components/Admin'
 import Modal from './components/Modal'
 
-const EMPTY = { teams: [], rooms: [], containers: [], items: [], orgPositions: [], orgMembers: [], checkouts: [], userTeams: [], profiles: [], compartments: [] }
+const EMPTY = { teams: [], rooms: [], containers: [], items: [], orgPositions: [], orgMembers: [], checkouts: [], userTeams: [], profiles: [], compartments: [], unitDocs: [] }
 
 export default function App() {
   const [session, setSession] = useState(null)

@@ -2,7 +2,7 @@ import { supabase } from './supabase'
 
 // ---- Load everything the SPA needs in one round-trip ----
 export async function loadAll() {
-  const [teams, rooms, containers, items, orgPositions, orgMembers, checkouts, userTeams, profiles, compartments] =
+  const [teams, rooms, containers, items, orgPositions, orgMembers, checkouts, userTeams, profiles, compartments, unitDocs] =
     await Promise.all([
       supabase.from('teams').select('*').order('name'),
       supabase.from('rooms').select('*').order('sort_order'),
@@ -15,6 +15,8 @@ export async function loadAll() {
       supabase.from('profiles').select('id, first_name, last_name, is_admin, is_approved, created_at'),
       // Missing until supabase_002_vehicle_compartments.sql is run; treated as empty.
       supabase.from('compartments').select('*').order('sort_order'),
+      // Missing until supabase_004_unit_documents.sql is run; treated as empty.
+      supabase.from('unit_documents').select('*').order('sort_order').order('uploaded_at'),
     ])
 
   const firstErr = [teams, rooms, containers, items].find((r) => r.error)
@@ -31,6 +33,7 @@ export async function loadAll() {
     userTeams: userTeams.data || [],
     profiles: profiles.data || [],
     compartments: compartments.data || [],
+    unitDocs: unitDocs.data || [],
   }
 }
 
@@ -135,6 +138,26 @@ export async function uploadItemPhoto(file, itemId, userId) {
   const url = data.publicUrl
   const res = await supabase.from('items').update({ photo_url: url, updated_by: userId || null }).eq('id', itemId)
   return { error: res.error, url }
+}
+
+// ---- Unit documents: SOP PDFs (Supabase Storage: bucket 'unit-docs') ----
+export async function uploadUnitDoc(file, containerId, title, sortOrder, userId) {
+  const safe = file.name.replace(/[^a-zA-Z0-9._-]/g, '_')
+  const path = `${containerId}/${Date.now()}-${safe}`
+  const up = await supabase.storage.from('unit-docs').upload(path, file, { contentType: 'application/pdf' })
+  if (up.error) return { error: up.error }
+  const { data } = supabase.storage.from('unit-docs').getPublicUrl(path)
+  const res = await supabase.from('unit_documents').insert({
+    container_id: containerId, title, file_path: path, url: data.publicUrl, sort_order: sortOrder, uploaded_by: userId || null,
+  })
+  if (res.error) await supabase.storage.from('unit-docs').remove([path])
+  return res
+}
+export async function renameUnitDoc(id, title) { return supabase.from('unit_documents').update({ title }).eq('id', id) }
+export async function deleteUnitDoc(doc) {
+  const res = await supabase.from('unit_documents').delete().eq('id', doc.id)
+  if (!res.error) await supabase.storage.from('unit-docs').remove([doc.file_path])
+  return res
 }
 
 // ---- Rooms (admin) ----

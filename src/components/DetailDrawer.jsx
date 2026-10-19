@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import {
   X, ChevronRight, Plus, Pencil, Trash2, ClipboardCheck, PackageOpen,
-  LogOut, LogIn, Save, QrCode, Camera, History, Truck, AlertTriangle, PackageX,
+  LogOut, LogIn, Save, QrCode, Camera, History, Truck, AlertTriangle, PackageX, FileText, Upload,
 } from 'lucide-react'
 import { replacementBadge, fmtDate, fmtDateTime, lowStock } from '../lib/helpers'
 import * as api from '../lib/data'
@@ -135,6 +135,34 @@ function ContainerForm({ teams, allowedTeamIds, isAdmin, onCancel, onSave }) {
   )
 }
 
+function DocForm({ file, initialTitle, onCancel, onSave }) {
+  const [title, setTitle] = useState(initialTitle || '')
+  const [err, setErr] = useState('')
+  const [busy, setBusy] = useState(false)
+  async function submit() {
+    if (!title.trim()) { setErr('Give the document a title'); return }
+    setBusy(true)
+    const r = await onSave(title.trim())
+    setBusy(false)
+    if (r && r.error) setErr(r.error.message)
+  }
+  return (
+    <div>
+      {file && <div className="hint" style={{ marginTop: 0 }}><FileText size={12} style={{ verticalAlign: '-2px' }} /> {file.name} · {(file.size / 1048576).toFixed(1)} MB</div>}
+      <div className="field">
+        <label>Title</label>
+        <input value={title} onChange={(e) => setTitle(e.target.value)} list="docTitles" placeholder="e.g. Setup SOP" autoFocus />
+        <datalist id="docTitles"><option value="Setup SOP" /><option value="Takedown SOP" /></datalist>
+      </div>
+      {err && <div className="errText">{err}</div>}
+      <div className="formActions">
+        <button className="btn ghost" onClick={onCancel}>Cancel</button>
+        <button className="btn accent" onClick={submit} disabled={busy}>{busy ? (file ? 'Uploading…' : 'Saving…') : (file ? 'Upload' : 'Save')}</button>
+      </div>
+    </div>
+  )
+}
+
 function CompartmentRow({ comp, onSave, onDelete }) {
   const [f, setF] = useState({ name: comp.name, side: comp.side, sort_order: comp.sort_order })
   const dirty = f.name !== comp.name || f.side !== comp.side || String(f.sort_order) !== String(comp.sort_order)
@@ -218,6 +246,7 @@ export default function DetailDrawer({ ctx, drawer, hitCompartmentIds }) {
     .filter((i) => i.container_id === drawer.containerId)
     .sort((a, b) => (compRank[a.compartment_id] ?? 1e9) - (compRank[b.compartment_id] ?? 1e9))
   const selectedComp = compById[drawer.compartmentId] || null
+  const unitDocs = (data.unitDocs || []).filter((d) => d.container_id === drawer.containerId)
   const canEdit = canEditContainer(container)
 
   useEffect(() => { setTab('items') }, [drawer.containerId])
@@ -358,7 +387,7 @@ export default function DetailDrawer({ ctx, drawer, hitCompartmentIds }) {
           {container?.is_vehicle_unit && (
             <div className="tabs">
               <button className={'tab' + (tab === 'items' ? ' active' : '')} onClick={() => setTab('items')}>Gear</button>
-              <button className={'tab' + (tab === 'sop' ? ' active' : '')} onClick={() => setTab('sop')}>Setup / Takedown</button>
+              <button className={'tab' + (tab === 'sop' ? ' active' : '')} onClick={() => setTab('sop')}>SOPs{unitDocs.length ? ` (${unitDocs.length})` : ''}</button>
             </div>
           )}
 
@@ -429,28 +458,63 @@ export default function DetailDrawer({ ctx, drawer, hitCompartmentIds }) {
     )
   }
 
+  function pickDoc(e) {
+    const file = e.target.files && e.target.files[0]
+    e.target.value = ''
+    if (!file) return
+    if (file.type && file.type !== 'application/pdf') { alert('Please choose a PDF file.'); return }
+    if (file.size > 25 * 1048576) { alert('That PDF is over 25 MB — please use a smaller file.'); return }
+    const guess = /take\s*-?down/i.test(file.name) ? 'Takedown SOP' : /set\s*-?up/i.test(file.name) ? 'Setup SOP' : file.name.replace(/\.pdf$/i, '').replace(/[_-]+/g, ' ')
+    setModal({ type: 'doc', file, title: guess })
+  }
+
   function renderSOP() {
-    if (!canEdit) {
-      return (
-        <>
-          <p className="sectionLabel">Setup procedure</p>
-          <div className="sopText" style={{ marginBottom: 16 }}>{container?.setup_sop || 'No setup procedure logged yet.'}</div>
-          <p className="sectionLabel">Takedown procedure</p>
-          <div className="sopText">{container?.takedown_sop || 'No takedown procedure logged yet.'}</div>
-          {container?.sop_updated_at && <div className="hint" style={{ marginTop: 10 }}>Updated {fmtDateTime(container.sop_updated_at)}{container.sop_updated_by ? ' by ' + profileName(container.sop_updated_by) : ''}</div>}
-        </>
-      )
-    }
+    const hasNotes = !!(container?.setup_sop || container?.takedown_sop)
     return (
       <>
-        <div className="field"><label>Setup procedure</label>
-          <textarea value={sop.setup_sop} onChange={(e) => setSop({ ...sop, setup_sop: e.target.value })} placeholder="Describe how this unit is set up for deployment…" />
-        </div>
-        <div className="field"><label>Takedown procedure</label>
-          <textarea value={sop.takedown_sop} onChange={(e) => setSop({ ...sop, takedown_sop: e.target.value })} placeholder="Describe how this unit is packed down after use…" />
-        </div>
-        {container?.sop_updated_at && <div className="hint">Updated {fmtDateTime(container.sop_updated_at)}{container.sop_updated_by ? ' by ' + profileName(container.sop_updated_by) : ''}</div>}
-        <button className="btn accent block" style={{ marginTop: 10 }} onClick={async () => done(await api.saveSOP(container.id, sop, userId))}><Save size={15} /> Save setup / takedown</button>
+        <p className="sectionLabel">Documents</p>
+        {unitDocs.length === 0 ? (
+          <div className="hint" style={{ marginBottom: 10 }}>No SOP documents yet.{canEdit ? ' Upload the setup and takedown PDFs here.' : ''}</div>
+        ) : unitDocs.map((d) => (
+          <div key={d.id} className="listRow docRow">
+            <a className="lr-main docLink" href={d.url} target="_blank" rel="noopener noreferrer">
+              <div className="lr-title"><FileText size={15} color="var(--accent)" /> {d.title}</div>
+              <div className="lr-sub">PDF · added {fmtDate(d.uploaded_at)}{d.uploaded_by ? ' by ' + profileName(d.uploaded_by) : ''}</div>
+            </a>
+            {canEdit && (
+              <div className="rowActions" style={{ margin: 0 }}>
+                <button className="btn sm ghost" title="Rename" onClick={() => setModal({ type: 'doc', doc: d, title: d.title })}><Pencil size={13} /></button>
+                <button className="btn sm danger" title="Delete" onClick={async () => { if (confirm(`Delete “${d.title}”?`)) done(await api.deleteUnitDoc(d)) }}><Trash2 size={13} /></button>
+              </div>
+            )}
+          </div>
+        ))}
+        {canEdit && (
+          <label className="btn dashed block" style={{ marginTop: 6, cursor: 'pointer' }}>
+            <Upload size={14} /> Upload PDF
+            <input type="file" accept="application/pdf,.pdf" style={{ display: 'none' }} onChange={pickDoc} />
+          </label>
+        )}
+
+        {canEdit ? (
+          <>
+            <p className="sectionLabel" style={{ marginTop: 22 }}>Quick notes (optional)</p>
+            <div className="field"><label>Setup</label>
+              <textarea value={sop.setup_sop} onChange={(e) => setSop({ ...sop, setup_sop: e.target.value })} placeholder="Short reminders shown under the documents…" />
+            </div>
+            <div className="field"><label>Takedown</label>
+              <textarea value={sop.takedown_sop} onChange={(e) => setSop({ ...sop, takedown_sop: e.target.value })} placeholder="Short reminders shown under the documents…" />
+            </div>
+            {container?.sop_updated_at && <div className="hint">Updated {fmtDateTime(container.sop_updated_at)}{container.sop_updated_by ? ' by ' + profileName(container.sop_updated_by) : ''}</div>}
+            <button className="btn accent block" style={{ marginTop: 10 }} onClick={async () => done(await api.saveSOP(container.id, sop, userId))}><Save size={15} /> Save notes</button>
+          </>
+        ) : hasNotes && (
+          <>
+            <p className="sectionLabel" style={{ marginTop: 22 }}>Quick notes</p>
+            {container?.setup_sop && <><div className="hint" style={{ margin: '0 0 4px' }}>Setup</div><div className="sopText" style={{ marginBottom: 12 }}>{container.setup_sop}</div></>}
+            {container?.takedown_sop && <><div className="hint" style={{ margin: '0 0 4px' }}>Takedown</div><div className="sopText">{container.takedown_sop}</div></>}
+          </>
+        )}
       </>
     )
   }
@@ -621,6 +685,17 @@ export default function DetailDrawer({ ctx, drawer, hitCompartmentIds }) {
             const sort = (containersOfRoom.reduce((m, c) => Math.max(m, c.sort_order || 0), 0) || 0) + 1
             const r = await api.addContainer({ ...p, room_id: drawer.roomId, sort_order: sort })
             if (!r.error) { setModal(null); await refresh() } return r
+          }} />
+        </ModalWrap>
+      )}
+      {modal?.type === 'doc' && container && (
+        <ModalWrap title={modal.doc ? 'Rename document' : 'Upload SOP document'} onClose={() => setModal(null)}>
+          <DocForm file={modal.file} initialTitle={modal.title} onCancel={() => setModal(null)} onSave={async (title) => {
+            const r = modal.doc
+              ? await api.renameUnitDoc(modal.doc.id, title)
+              : await api.uploadUnitDoc(modal.file, container.id, title, unitDocs.length + 1, userId)
+            if (!r.error) { setModal(null); await refresh() }
+            return r
           }} />
         </ModalWrap>
       )}
