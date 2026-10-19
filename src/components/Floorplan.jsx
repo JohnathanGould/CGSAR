@@ -56,6 +56,15 @@ export default function Floorplan({ rooms, activeRoomId, hitRoomIds, onRoomClick
           )
         })}
       </svg>
+      {/* Phone layout: the plan is too small to tap, so list the rooms too. */}
+      <div className="roomList">
+        {rooms.map((r) => (
+          <div key={r.id} className={'listRow' + (hits.has(r.id) ? ' selectedRow' : '')} onClick={() => onRoomClick(r)}>
+            <div className="lr-main"><div className="lr-title">{r.name}</div>{r.kind && <div className="lr-sub">{r.kind}</div>}</div>
+            <span className="lr-arrow">›</span>
+          </div>
+        ))}
+      </div>
     </div>
   )
 }

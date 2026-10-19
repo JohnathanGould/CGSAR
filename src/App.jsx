@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import {
-  Search, LayoutDashboard, Map, Users, Shield, LogIn, LogOut, Siren, HelpCircle,
+  Search, LayoutDashboard, Map, Users, Shield, LogIn, LogOut, Siren, HelpCircle, UserCircle,
 } from 'lucide-react'
 import { supabase } from './lib/supabase'
 import logo from './assets/logo.png'
@@ -31,6 +31,7 @@ export default function App() {
   const [query, setQuery] = useState('')
   const [authOpen, setAuthOpen] = useState(false)
   const [helpOpen, setHelpOpen] = useState(false)
+  const [accountOpen, setAccountOpen] = useState(false) // phone layout: account panel folded away
   // Admin-only preview: 'self' | 'member' | 'team:<id>' | 'public'
   const [viewAs, setViewAs] = useState('self')
   const [recoveryOpen, setRecoveryOpen] = useState(false)
@@ -144,7 +145,7 @@ export default function App() {
   }
 
   const NavItem = ({ id, icon: Icon, label }) => (
-    <button className={'navItem' + (view === id && !drawer.open ? ' active' : '')} onClick={() => { setView(id); closeDrawer() }}>
+    <button className={'navItem' + (view === id && !drawer.open ? ' active' : '')} onClick={(e) => { e.currentTarget.scrollIntoView({ block: 'nearest', inline: 'nearest' }); setView(id); closeDrawer() }}>
       <Icon size={17} /> {label}
     </button>
   )
@@ -162,6 +163,7 @@ export default function App() {
           <div className="brandRow">
             <h1>Home Base</h1>
             <img src={logo} className="brandLogo" alt="Colchester Ground Search &amp; Rescue Association" />
+            <button className={'acctBtn' + (accountOpen ? ' active' : '')} aria-label="Account" title="Account" onClick={() => setAccountOpen(!accountOpen)}><UserCircle size={22} /></button>
           </div>
           <div className="sub">73 Ventura Dr, Debert NS</div>
         </div>
@@ -191,7 +193,7 @@ export default function App() {
           {isAdmin && <NavItem id="admin" icon={Shield} label="Admin" />}
         </div>
 
-        <div id="authbox">
+        <div id="authbox" className={accountOpen ? 'open' : ''}>
           {session ? (
             <>
               <div className="who">{fullName(profile) || session.user.email}</div>

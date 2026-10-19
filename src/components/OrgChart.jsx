@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import { Plus, Trash2, Pencil, CornerDownRight, ChevronRight, UserPlus, Star } from 'lucide-react'
 import * as api from '../lib/data'
 import Modal from './Modal'
@@ -26,6 +26,13 @@ export default function OrgChart({ ctx }) {
   const { data, isAdmin, refresh } = ctx
   const [selected, setSelected] = useState(null)
   const [modal, setModal] = useState(null)
+  const panelRef = useRef(null)
+  // Phone layout stacks the panel under the tree: bring it into view on select.
+  useEffect(() => {
+    if (selected && window.matchMedia('(max-width: 900px)').matches) {
+      panelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }
+  }, [selected])
 
   const rows = buildRows(data.orgPositions)
   // The people filling a position (usually one; co-chairs or a deputy possible).
@@ -91,7 +98,7 @@ export default function OrgChart({ ctx }) {
         </div>
 
         {/* roster */}
-        <div className="card">
+        <div className="card" ref={panelRef} style={{ scrollMarginTop: 220 }}>
           {!sel ? <div className="hint">Select a position or unit to see who’s in it.</div> : !isExecutive(sel) ? (
             <UnitPanel unit={sel} people={membersOf(sel.id)} isAdmin={isAdmin}
               onAdd={() => setModal({ type: 'person', positionId: sel.id, unit: true })}
