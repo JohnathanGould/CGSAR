@@ -3,10 +3,9 @@ import Modal from './Modal'
 
 const SECTIONS = [
   ['Finding equipment', 'Click a room on the floorplan, tap a container/shelf/unit to see what\u2019s inside, or use the search box to jump straight to an item.'],
-  ['Callout view', 'A fast, read-only pre-departure screen \u2014 one card per vehicle/trailer unit showing its team, item count, setup/takedown SOPs side-by-side, and red/amber flags for anything needing attention (items overdue for replacement or low on stock) before it rolls. No login needed to view it.'],
   ['Taking inventory', 'Open a container you have edit access to, use \u201cTake Inventory,\u201d adjust quantities, and save \u2014 this logs who did it and when. You can review past checks under \u201cView check history.\u201d'],
   ['Signing gear out', 'On any item, use \u201cCheck out\u201d to record who has it and when it\u2019s due back; use \u201cCheck in\u201d when it\u2019s returned.'],
-  ['Vehicle SOPs', 'Vehicle/trailer units have an \u201cSOP\u201d tab for setup and takedown procedures \u2014 the same text shown on the Callout cards.'],
+  ['Vehicles & trailers', 'Open any unit in Vehicle Bays to see it at a glance: red/amber flags for gear overdue for replacement or low on stock, its gear by compartment, and an SOPs tab with its setup/takedown PDF documents (tap one to open it). The unit\u2019s team can upload, rename or remove documents. The Vehicle Bays list shows each unit\u2019s flags too.'],
   ['Org chart', 'See the association\u2019s executive positions (who fills each one, or vacant) and its units (lead and members). Tap any one for details.'],
   ['Logging in', 'Sign up with your name, email, and password. An admin approves new accounts before you get full access.'],
   ['If you\u2019re on a team', 'You can edit items and take inventory for your team\u2019s shelves/units. Everything else stays read-only to you.'],
