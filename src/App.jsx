@@ -6,6 +6,7 @@ import { supabase } from './lib/supabase'
 import logo from './assets/logo.png'
 import { loadAll } from './lib/data'
 import { saveCache, loadCache } from './lib/cache'
+import { newerBundle, reloadToNewVersion } from './lib/updateCheck'
 import { replacementBadge } from './lib/helpers'
 import Floorplan, { topoPaths } from './components/Floorplan'
 import VehicleDiagram from './components/VehicleDiagram'
@@ -31,6 +32,7 @@ export default function App() {
   const [query, setQuery] = useState('')
   const [authOpen, setAuthOpen] = useState(false)
   const [helpOpen, setHelpOpen] = useState(false)
+  const [updateTarget, setUpdateTarget] = useState(null) // newer deploy found while in use
   const [accountOpen, setAccountOpen] = useState(false) // phone layout: account panel folded away
   // Admin-only preview: 'self' | 'member' | 'team:<id>' | 'public'
   const [viewAs, setViewAs] = useState('self')
@@ -62,6 +64,26 @@ export default function App() {
     })
     refresh()
     return () => sub.subscription.unsubscribe()
+  }, [])
+
+  // Pick up new deploys: reload straight away when the app is opened or brought
+  // back to the foreground (nothing is mid-edit then); while it's in use, offer
+  // an Update button instead of interrupting.
+  useEffect(() => {
+    let busy = false
+    async function check(reloadNow) {
+      if (busy) return
+      busy = true
+      const target = await newerBundle()
+      busy = false
+      if (!target) return
+      if (!(reloadNow && reloadToNewVersion(target))) setUpdateTarget(target)
+    }
+    check(true)
+    const onVisible = () => { if (document.visibilityState === 'visible') check(true) }
+    document.addEventListener('visibilitychange', onVisible)
+    const timer = setInterval(() => check(false), 15 * 60 * 1000)
+    return () => { document.removeEventListener('visibilitychange', onVisible); clearInterval(timer) }
   }, [])
 
   // QR deep link: ?container=<id> opens that container once data is ready.
@@ -222,6 +244,12 @@ export default function App() {
 
       {/* main */}
       <div id="main">
+        {updateTarget && (
+          <div className="previewBar updateBar">
+            A new version of the app is available.
+            <button className="btn sm accent" onClick={() => reloadToNewVersion(updateTarget, { force: true })}>Update</button>
+          </div>
+        )}
         {previewing && (
           <div className="previewBar">
             Previewing the app as {viewAsLabel}. Anything you change still saves with your admin rights.
@@ -277,7 +305,7 @@ export default function App() {
       </div>
 
       {/* drawer */}
-      <DetailDrawer ctx={ctx} drawer={drawer} />
+      <DetailDrawer ctx={ctx} drawer={drawer} hitCompartmentIds={hitCompartmentIds} />
 
       {authOpen && <AuthModal onClose={() => setAuthOpen(false)} />}
       {helpOpen && <HelpModal isAdmin={isAdmin} onClose={() => setHelpOpen(false)} />}

@@ -7,6 +7,7 @@ import { replacementBadge, fmtDate, fmtDateTime, lowStock } from '../lib/helpers
 import * as api from '../lib/data'
 import { SIDES, compartmentsOf, compartmentLabel } from '../lib/compartments'
 import QRModal from './QRModal'
+import VehicleDiagram from './VehicleDiagram'
 
 /* ------------------------- small forms ------------------------- */
 function ItemForm({ initial, compartments = [], defaultCompartmentId, onCancel, onSave }) {
@@ -175,7 +176,7 @@ function CompartmentEditor({ container, compartments, items, onChange }) {
 }
 
 /* ------------------------- main drawer ------------------------- */
-export default function DetailDrawer({ ctx, drawer }) {
+export default function DetailDrawer({ ctx, drawer, hitCompartmentIds }) {
   const {
     data, session, userId, isAdmin, myTeamIds, canEditContainer, teamName, profileName,
     refresh, openRoom, openContainer, openItem, openInventory, closeDrawer, selectCompartment,
@@ -374,6 +375,9 @@ export default function DetailDrawer({ ctx, drawer }) {
     const shown = selectedComp ? groups.filter((g) => g.comp?.id === selectedComp.id) : groups.filter((g) => g.comp || g.items.length)
     return (
       <>
+        {/* Phones have no room for the main-area diagram, so show a portrait one here. */}
+        <VehicleDiagram layout="tall" className="phoneOnly" compartments={compartments} items={itemsOfContainer}
+          selectedId={drawer.compartmentId} hitIds={hitCompartmentIds} onSelect={selectCompartment} />
         <div className="chipRow">
           <button className={'chip' + (!selectedComp ? ' active' : '')} onClick={() => selectCompartment(null)}>Whole unit</button>
           {compartments.map((c) => (

@@ -48,6 +48,7 @@ a{color:inherit;text-decoration:none;}
 #authbox .role{color:var(--accent);font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;}
 
 .previewBar{display:flex;align-items:center;justify-content:center;gap:12px;flex-wrap:wrap;background:#16283a;color:#cfe6ff;font-size:12.5px;padding:6px 12px;text-align:center;border-bottom:1px solid #24476b;}
+.updateBar{background:var(--accent-dim);color:#ffd8bf;border-bottom-color:#8a3a0c;}
 .offlineBar{background:var(--accent-dim);color:#ffd8bf;font-size:12px;padding:6px 12px;text-align:center;}
 
 /* ---------- main ---------- */
@@ -79,8 +80,8 @@ svg#plan{width:100%;max-width:1100px;height:auto;}
 .outerWall{fill:none;stroke:var(--line);stroke-width:3;}
 
 /* vehicle diagram (compartments) */
-#vehiclewrap{display:flex;flex-direction:column;align-items:center;}
-svg#vehicle{width:100%;max-width:1100px;height:auto;}
+#vehiclewrap,.vehiclewrap{display:flex;flex-direction:column;align-items:center;}
+svg.vehicle{width:100%;max-width:1100px;height:auto;}
 .vehBody{fill:#121212;stroke:#4a4a4a;stroke-width:2;}
 .wheel{fill:#2a2a2a;stroke:#4a4a4a;stroke-width:1;}
 .compSlot{cursor:pointer;}
@@ -89,7 +90,7 @@ svg#vehicle{width:100%;max-width:1100px;height:auto;}
 .comp.active{fill:var(--room-active);stroke:var(--accent);stroke-width:2.5;}
 .comp.has-hit{fill:var(--accent-dim);stroke:var(--accent);stroke-width:3;}
 .compEmpty{fill:none;stroke:var(--line);stroke-width:1.5;stroke-dasharray:6 5;}
-.compEmptyText{fill:var(--muted);font-size:15px;text-anchor:middle;pointer-events:none;}
+.compEmptyText{color:var(--muted);font-size:15px;}
 .compLabel{height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;padding:4px 6px;text-align:center;overflow:hidden;}
 .compName{color:var(--text);font-size:17px;font-weight:700;line-height:1.15;}
 .compCount{color:var(--muted);font-size:13px;}
@@ -106,7 +107,14 @@ svg#vehicle{width:100%;max-width:1100px;height:auto;}
 .compRow input:focus,.compRow select:focus{border-color:var(--accent);}
 .compRow input:first-child{flex:2;}
 .compRow input.num{flex:0 0 56px;}
-svg#vehicle .zoneLabel{font-size:14px;}
+svg.vehicle .zoneLabel{font-size:14px;}
+.vehiclewrap.tall svg.vehicle{max-width:420px;}
+.vehiclewrap.tall .zoneLabel{font-size:20px;}
+.vehiclewrap.tall .compName{font-size:21px;}
+.vehiclewrap.tall .compCount{font-size:16px;}
+.vehiclewrap.tall .compEmptyText{font-size:19px;}
+.vehiclewrap.tall .vehicleFoot{font-size:12px;margin:2px 0 14px;}
+.phoneOnly{display:none;}
 
 /* ---------- drawer ---------- */
 #drawer{position:relative;z-index:2;width:0;min-width:0;background:var(--panel);border-left:1px solid var(--line);
@@ -255,7 +263,8 @@ svg#vehicle .zoneLabel{font-size:14px;}
   #content{padding:14px;overflow:visible;}
   #drawer{display:none;}
   #drawer.open{display:block;position:fixed;inset:0;width:100%;min-width:0;z-index:40;border-left:none;}
-  #drawerInner{width:100%;}
+  #drawerInner{width:100%;overflow-y:auto;}
+  #drawerBody{flex:none;overflow:visible;}
   #drawerHead{padding-top:48px;}
   .modalOverlay{padding:10px;align-items:flex-start;}
   .modal{max-height:calc(100vh - 20px);padding:18px;}
@@ -266,4 +275,5 @@ svg#vehicle .zoneLabel{font-size:14px;}
   .pageHead h2{font-size:20px;}
   #floorwrap{flex-direction:column;align-items:stretch;}
   .roomList{display:block;margin-top:14px;}
+  .phoneOnly{display:flex;}
 }
