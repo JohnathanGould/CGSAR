@@ -1,13 +1,26 @@
 import React, { useEffect, useState } from 'react'
 import {
   X, ChevronRight, Plus, Pencil, Trash2, ClipboardCheck, PackageOpen,
-  LogOut, LogIn, Save, QrCode, Camera, History, Truck,
+  LogOut, LogIn, Save, QrCode, Camera, History, Truck, AlertTriangle, PackageX,
 } from 'lucide-react'
 import { replacementBadge, fmtDate, fmtDateTime, lowStock } from '../lib/helpers'
 import * as api from '../lib/data'
 import { SIDES, compartmentsOf, compartmentLabel } from '../lib/compartments'
 import QRModal from './QRModal'
 import VehicleDiagram from './VehicleDiagram'
+
+// Red/amber flags for gear needing attention before a unit rolls.
+function UnitFlags({ items, style }) {
+  const repl = items.filter((i) => replacementBadge(i.needs_replacement_by)).length
+  const low = items.filter(lowStock).length
+  if (!repl && !low) return null
+  return (
+    <div className="rowActions" style={{ margin: 0, ...style }}>
+      {repl > 0 && <span className="badge overdue"><AlertTriangle size={11} /> {repl} to replace</span>}
+      {low > 0 && <span className="badge low"><PackageX size={11} /> {low} low stock</span>}
+    </div>
+  )
+}
 
 /* ------------------------- small forms ------------------------- */
 function ItemForm({ initial, compartments = [], defaultCompartmentId, onCancel, onSave }) {
@@ -274,15 +287,17 @@ export default function DetailDrawer({ ctx, drawer, hitCompartmentIds }) {
             <div className="emptyState"><div className="big">🗄️</div>Nothing logged in this room yet.</div>
           ) : (
             <>
-              <p className="sectionLabel">Tap a shelf to see what’s inside</p>
+              <p className="sectionLabel">{containersOfRoom.every((c) => c.is_vehicle_unit) ? 'Tap a unit for its gear and setup / takedown' : 'Tap a shelf to see what’s inside'}</p>
               {containersOfRoom.map((c) => {
-                const n = data.items.filter((i) => i.container_id === c.id).length
+                const its = data.items.filter((i) => i.container_id === c.id)
+                const n = its.length
                 const tn = teamName(c.team_id)
                 return (
                   <div key={c.id} className="containerRow" onClick={() => openContainer(c.room_id, c.id)}>
                     <div>
                       <div className="crName">{c.name} {tn && <span className="teamBadge">{tn}</span>}</div>
                       <div className="crCount">{n === 1 ? '1 item' : n + ' items'} · {c.last_checked_at ? 'checked ' + fmtDate(c.last_checked_at) : 'never checked'}</div>
+                      <UnitFlags items={its} style={{ marginTop: 6 }} />
                     </div>
                     <ChevronRight className="crArrow" size={18} />
                   </div>
@@ -312,6 +327,7 @@ export default function DetailDrawer({ ctx, drawer, hitCompartmentIds }) {
               ? `Last checked ${fmtDate(container.last_checked_at)}${container.last_checked_by ? ' by ' + profileName(container.last_checked_by) : ''}`
               : 'Never checked'}
           </div>
+          <UnitFlags items={itemsOfContainer} style={{ marginBottom: 12 }} />
 
           <button className="btn sm" style={{ marginBottom: 14 }} onClick={() => setModal({ type: 'qr' })}><QrCode size={13} /> QR tag</button>
 
@@ -341,8 +357,8 @@ export default function DetailDrawer({ ctx, drawer, hitCompartmentIds }) {
 
           {container?.is_vehicle_unit && (
             <div className="tabs">
-              <button className={'tab' + (tab === 'items' ? ' active' : '')} onClick={() => setTab('items')}>Items</button>
-              <button className={'tab' + (tab === 'sop' ? ' active' : '')} onClick={() => setTab('sop')}>SOP</button>
+              <button className={'tab' + (tab === 'items' ? ' active' : '')} onClick={() => setTab('items')}>Gear</button>
+              <button className={'tab' + (tab === 'sop' ? ' active' : '')} onClick={() => setTab('sop')}>Setup / Takedown</button>
             </div>
           )}
 
@@ -414,16 +430,27 @@ export default function DetailDrawer({ ctx, drawer, hitCompartmentIds }) {
   }
 
   function renderSOP() {
+    if (!canEdit) {
+      return (
+        <>
+          <p className="sectionLabel">Setup procedure</p>
+          <div className="sopText" style={{ marginBottom: 16 }}>{container?.setup_sop || 'No setup procedure logged yet.'}</div>
+          <p className="sectionLabel">Takedown procedure</p>
+          <div className="sopText">{container?.takedown_sop || 'No takedown procedure logged yet.'}</div>
+          {container?.sop_updated_at && <div className="hint" style={{ marginTop: 10 }}>Updated {fmtDateTime(container.sop_updated_at)}{container.sop_updated_by ? ' by ' + profileName(container.sop_updated_by) : ''}</div>}
+        </>
+      )
+    }
     return (
       <>
         <div className="field"><label>Setup procedure</label>
-          <textarea disabled={!canEdit} value={sop.setup_sop} onChange={(e) => setSop({ ...sop, setup_sop: e.target.value })} placeholder={canEdit ? 'Describe how this unit is set up for deployment…' : 'No setup procedure logged yet.'} />
+          <textarea value={sop.setup_sop} onChange={(e) => setSop({ ...sop, setup_sop: e.target.value })} placeholder="Describe how this unit is set up for deployment…" />
         </div>
         <div className="field"><label>Takedown procedure</label>
-          <textarea disabled={!canEdit} value={sop.takedown_sop} onChange={(e) => setSop({ ...sop, takedown_sop: e.target.value })} placeholder={canEdit ? 'Describe how this unit is packed down after use…' : 'No takedown procedure logged yet.'} />
+          <textarea value={sop.takedown_sop} onChange={(e) => setSop({ ...sop, takedown_sop: e.target.value })} placeholder="Describe how this unit is packed down after use…" />
         </div>
         {container?.sop_updated_at && <div className="hint">Updated {fmtDateTime(container.sop_updated_at)}{container.sop_updated_by ? ' by ' + profileName(container.sop_updated_by) : ''}</div>}
-        {canEdit && <button className="btn accent block" style={{ marginTop: 10 }} onClick={async () => done(await api.saveSOP(container.id, sop, userId))}><Save size={15} /> Save SOP</button>}
+        <button className="btn accent block" style={{ marginTop: 10 }} onClick={async () => done(await api.saveSOP(container.id, sop, userId))}><Save size={15} /> Save setup / takedown</button>
       </>
     )
   }

@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import {
-  Search, LayoutDashboard, Map, Users, Shield, LogIn, LogOut, Siren, HelpCircle, UserCircle,
+  Search, LayoutDashboard, Map, Users, Shield, LogIn, LogOut, HelpCircle, UserCircle,
 } from 'lucide-react'
 import { supabase } from './lib/supabase'
 import logo from './assets/logo.png'
@@ -12,7 +12,6 @@ import Floorplan, { topoPaths } from './components/Floorplan'
 import VehicleDiagram from './components/VehicleDiagram'
 import { compartmentsOf } from './lib/compartments'
 import Dashboard from './components/Dashboard'
-import Callout from './components/Callout'
 import DetailDrawer from './components/DetailDrawer'
 import HelpModal from './components/HelpModal'
 import OrgChart from './components/OrgChart'
@@ -155,7 +154,7 @@ export default function App() {
       const comp = data.compartments.find((x) => x.id === (it ? it.compartment_id : drawer.compartmentId))
       return ['Base', room?.name, c?.name, comp?.name, it?.name].filter(Boolean).join('  ›  ')
     }
-    return { dashboard: 'Base Dashboard', floorplan: 'Base Overview', callout: 'Callout', org: 'Org Chart', units: 'Org Chart', admin: 'Admin' }[view]
+    return { dashboard: 'Base Dashboard', floorplan: 'Base Overview', org: 'Org Chart', units: 'Org Chart', admin: 'Admin' }[view]
   }
 
   const viewAsLabel = viewAs === 'public' ? 'the public (not signed in)'
@@ -210,7 +209,6 @@ export default function App() {
         <div id="nav">
           <NavItem id="dashboard" icon={LayoutDashboard} label="Dashboard" />
           <NavItem id="floorplan" icon={Map} label="Floorplan" />
-          <NavItem id="callout" icon={Siren} label="Callout" />
           <NavItem id="org" icon={Users} label="Org Chart" />
           {isAdmin && <NavItem id="admin" icon={Shield} label="Admin" />}
         </div>
@@ -292,8 +290,6 @@ export default function App() {
             />
           ) : view === 'floorplan' ? (
             <Floorplan rooms={data.rooms} activeRoomId={drawer.roomId} hitRoomIds={hitRoomIds} onRoomClick={(r) => openRoom(r.id)} />
-          ) : view === 'callout' ? (
-            <Callout ctx={ctx} />
           ) : view === 'units' ? (
             <OrgChart ctx={ctx} />
           ) : view === 'org' ? (
