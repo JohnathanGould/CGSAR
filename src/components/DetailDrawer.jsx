@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import {
   X, ChevronRight, Plus, Pencil, Trash2, ClipboardCheck, PackageOpen,
-  LogOut, LogIn, Save, QrCode, Camera, History, Truck, AlertTriangle, PackageX, FileText, Upload, Clock, CalendarCheck,
+  LogOut, LogIn, Save, QrCode, Camera, History, AlertTriangle, PackageX, FileText, Upload, Clock, CalendarCheck,
 } from 'lucide-react'
 import { replacementBadge, fmtDate, fmtDateTime, lowStock } from '../lib/helpers'
 import * as api from '../lib/data'
@@ -237,7 +237,7 @@ function CompartmentEditor({ container, compartments, items, onChange }) {
 export default function DetailDrawer({ ctx, drawer, hitCompartmentIds }) {
   const {
     data, session, userId, isAdmin, myTeamIds, canEditContainer, teamName, profileName,
-    refresh, openRoom, openContainer, openItem, openInventory, closeDrawer, selectCompartment,
+    refresh, openRoom, openContainer, openItem, openInventory, closeDrawer, selectCompartment, setManageCompartments,
   } = ctx
 
   const [tab, setTab] = useState('items')
@@ -433,22 +433,19 @@ export default function DetailDrawer({ ctx, drawer, hitCompartmentIds }) {
     )
   }
 
-  // Vehicle with compartments: chips to pick one, items grouped by compartment.
+  // Vehicle with compartments: items grouped by compartment; the diagram picks one.
   function renderCompartmentItems() {
     const groups = [...compartments.map((c) => ({ comp: c, items: itemsOfContainer.filter((i) => i.compartment_id === c.id) })),
       { comp: null, items: itemsOfContainer.filter((i) => !compById[i.compartment_id]) }]
     const shown = selectedComp ? groups.filter((g) => g.comp?.id === selectedComp.id) : groups.filter((g) => g.comp || g.items.length)
     return (
       <>
-        {/* Phones have no room for the main-area diagram, so show a portrait one here. */}
-        <VehicleDiagram layout="tall" className="phoneOnly" compartments={compartments} items={itemsOfContainer}
-          selectedId={drawer.compartmentId} hitIds={hitCompartmentIds} onSelect={selectCompartment} />
-        <div className="chipRow">
-          <button className={'chip' + (!selectedComp ? ' active' : '')} onClick={() => selectCompartment(null)}>Whole unit</button>
-          {compartments.map((c) => (
-            <button key={c.id} className={'chip' + (selectedComp?.id === c.id ? ' active' : '')} onClick={() => selectCompartment(c.id)}>{c.name}</button>
-          ))}
-        </div>
+        {selectedComp && (
+          <div className="compFilter">
+            <span>Showing <b>{selectedComp.name}</b></span>
+            <button className="btn sm ghost" onClick={() => selectCompartment(null)}>Show whole unit</button>
+          </div>
+        )}
         {shown.map(({ comp, items }) => (
           <div key={comp ? comp.id : 'none'}>
             <div className="compHead"><span>{comp ? compartmentLabel(comp) : 'Not assigned to a compartment'}</span><span>{items.length}</span></div>
@@ -465,8 +462,11 @@ export default function DetailDrawer({ ctx, drawer, hitCompartmentIds }) {
         {canEdit && itemsOfContainer.length > 0 && (
           <button className="btn accent block" style={{ marginBottom: 12 }} onClick={() => openInventory(drawer.roomId, drawer.containerId)}><ClipboardCheck size={15} /> Take Inventory</button>
         )}
-        {container?.is_vehicle_unit && canEdit && (
-          <button className="btn sm block" style={{ marginBottom: 12 }} onClick={() => setModal({ type: 'compartments' })}><Truck size={13} /> {compartments.length ? 'Manage compartments' : 'Set up compartments'}</button>
+        {/* Phones have no room for the main-area diagram, so show a portrait one here. */}
+        {container?.is_vehicle_unit && (
+          <VehicleDiagram layout="tall" className="phoneOnly" compartments={compartments} items={itemsOfContainer}
+            selectedId={drawer.compartmentId} hitIds={hitCompartmentIds} onSelect={selectCompartment}
+            onManage={canEdit ? () => setManageCompartments(true) : null} />
         )}
         {compartments.length > 0 ? renderCompartmentItems() : itemsOfContainer.length === 0 ? (
           <div className="emptyState"><div className="big">📦</div>Nothing logged yet in {container?.name}.</div>
@@ -761,8 +761,8 @@ export default function DetailDrawer({ ctx, drawer, hitCompartmentIds }) {
           }} />
         </ModalWrap>
       )}
-      {modal?.type === 'compartments' && container && (
-        <ModalWrap title={'Compartments — ' + container.name} onClose={() => setModal(null)}>
+      {drawer.manage && container && (
+        <ModalWrap title={'Compartments — ' + container.name} onClose={() => setManageCompartments(false)}>
           <CompartmentEditor container={container} compartments={compartments} items={itemsOfContainer} onChange={refresh} />
         </ModalWrap>
       )}
